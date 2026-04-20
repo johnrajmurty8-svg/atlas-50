@@ -1,6 +1,6 @@
 # Atlas /50 — Build Plan
 
-> **Status:** Pending approval. Do not write code until John approves this plan.
+> **Status:** In progress — Phases 1–5 complete. Phase 6 (Polish) next.
 > **Working directory:** `atlas-50/app/` (Next.js 14 App Router scaffold already exists)
 > **Reference:** `docs/prd.md`, `docs/app-flow.md`, `docs/design.md`, `docs/backend-spec.md`, `CLAUDE.md`
 
@@ -23,7 +23,7 @@ Before Phase 1 begins, these decisions are confirmed in the spec docs:
 
 ---
 
-## Phase 1 — Project Setup
+## ✅ Phase 1 — Project Setup
 
 **Goal:** Clean, correctly configured Next.js project with all dependencies, folder structure, design tokens, and TypeScript types in place. Nothing visual yet — just the skeleton.
 
@@ -120,7 +120,7 @@ Add Plausible `<Script>` tag (placeholder domain `atlas-50.vercel.app` until pro
 
 ---
 
-## Phase 2 — Database Schema and Authentication
+## ✅ Phase 2 — Database Schema and Authentication
 
 > **V1 STATUS: DEFERRED.** Atlas /50 V1 uses static JSON only. No database, no auth.
 >
@@ -141,7 +141,7 @@ Add Plausible `<Script>` tag (placeholder domain `atlas-50.vercel.app` until pro
 
 ---
 
-## Phase 3 — Core API Endpoints
+## ✅ Phase 3 — Core API Endpoints
 
 > **V1 STATUS: NONE REQUIRED.** All data is static JSON imported at build time.
 >
@@ -160,7 +160,7 @@ app/src/data/destinations.json
 
 ---
 
-## Phase 4 — Frontend Shell
+## ✅ Phase 4 — Frontend Shell
 
 **Goal:** Render the full layout skeleton with correct positioning, fonts, and colours — but with placeholder content (no globe, no real data). After this phase, the layout zones should be visually correct.
 
@@ -223,7 +223,7 @@ If viewport width < 1024px, render a full-screen fallback message: "Atlas /50 is
 
 ---
 
-## Phase 5 — Feature Pages (Component by Component)
+## ✅ Phase 5 — Feature Pages (Component by Component)
 
 **Build order is strict. Port before building new.**
 
