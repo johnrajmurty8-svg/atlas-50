@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Globe Styles — Exploration</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+<style>
+  html, body { margin:0; padding:0; background:#f0eee9; overflow:hidden; }
+  body { font-family: 'Inter', sans-serif; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel">
+
+// ──────────────────────────────────────────────
+// Shared 3D globe — style prop swaps aesthetic
+// ──────────────────────────────────────────────
+function Globe({ width=520, height=520, style='classic' }) {
+  const mountRef = React.useRef(null);
+
+  React.useEffect(() => {
+    const mount = mountRef.current;
+    if (!mount) return;
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, width/height, 0.1, 100);
+    camera.position.z = 4.2;
+
+    const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(width, height);
+    renderer.setClearColor(0x000000, 0);
+    mount.appendChild(renderer.domElement);
+
+    const group = new THREE.Group();
+    scene.add(group);
+
+    // --- earth sphere (style-dependent) ---
+    let earthMesh, atmosphere, particles;
+    const R = 1.4;
+
+    // land/ocean mask built from a tiny equirectangular continents sketch via canvas
+    const maskCanvas = document.createElement('canvas');
+    maskCanvas.width = 1024; maskCanvas.height = 512;
+    const mctx = maskCanvas.getContext('2d');
+
+    // Draw simplified continents (polygon approximations)
+    const continents = [
+      // N. America
+      [[0.10,0.18],[0.18,0.16],[0.25,0.22],[0.28,0.32],[0.22,0.42],[0.16,0.46],[0.12,0.40],[0.08,0.30]],
+      // S. America
+      [[0.24,0.52],[0.30,0.52],[0.33,0.62],[0.30,0.76],[0.26,0.80],[0.22,0.70],[0.22,0.58]],
+      // Europe
+      [[0.47,0.24],[0.55,0.22],[0.56,0.30],[0.50,0.34],[0.46,0.32]],
+      // Africa
+      [[0.48,0.36],[0.56,0.36],[0.60,0.46],[0.56,0.62],[0.50,0.68],[0.46,0.60],[0.46,0.44]],
+      // Asia
+      [[0.56,0.22],[0.78,0.20],[0.85,0.30],[0.82,0.42],[0.70,0.46],[0.62,0.42],[0.58,0.32]],
+      // SE Asia / Indo
+      [[0.74,0.46],[0.82,0.48],[0.84,0.56],[0.76,0.56]],
+      // Australia
+      [[0.80,0.60],[0.88,0.60],[0.90,0.68],[0.84,0.72],[0.78,0.68]],
+      // Greenland
+      [[0.40,0.08],[0.46,0.08],[0.47,0.16],[0.42,0.18]],
+    ];
+
+    function drawEarth(fg, bg) {
+      mctx.fillStyle = bg;
+      mctx.fillRect(0,0,1024,512);
+      mctx.fillStyle = fg;
+      continents.forEach(poly => {
+        mctx.beginPath();
+        poly.forEach((p,i) => {
+          const x = p[0]*1024, y = p[1]*512;
+          if (i===0) mctx.moveTo(x,y); else mctx.lineTo(x,y);
+        });
+        mctx.closePath();
+        mctx.fill();
+      });
+    }
+
+    // Star dust backdrop (inside canvas)
+    const dustGeom = new THREE.BufferGeometry();
+    const dustCount = 400;
+    const dustPos = new Float32Array(dustCount*3);
+    for (let i=0;i<dustCount;i++){
+      const r = 8 + Math.random()*6;
+      const t = Math.random()*Math.PI*2;
+      const p = Math.acos(2*Math.random()-1);
+      dustPos[i*3]   = r*Math.sin(p)*Math.cos(t);
+      dustPos[i*3+1] = r*Math.sin(p)*Math.sin(t);
+      dustPos[i*3+2] = r*Math.cos(p);
+    }
+    dustGeom.setAttribute('position', new THREE.BufferAttribute(dustPos,3));
+    const dust = new THREE.Points(dustGeom, new THREE.PointsMaterial({
+      color:0xffffff, size:0.02, transparent:true, opacity:0.5,
+    }));
+    scene.add(dust);
+
+    if (style === 'classic') {
+      // Night earth — deep navy oceans, glowing ivory land, gold coasts
+      drawEarth('#d7c38a', '#0a1324');
+      const tex = new THREE.CanvasTexture(maskCanvas);
+      tex.anisotropy = 4;
+      earthMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(R, 96, 96),
+        new THREE.MeshBasicMaterial({ map: tex })
+      );
+      // Atmosphere glow
+      atmosphere = new THREE.Mesh(
+        new THREE.SphereGeometry(R*1.08, 64, 64),
+        new THREE.ShaderMaterial({
+          uniforms:{},
+          vertexShader:`varying vec3 vN; void main(){ vN = normalize(normalMatrix*normal); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
+          fragmentShader:`varying vec3 vN; void main(){ float i = pow(0.7 - dot(vN, vec3(0.,0.,1.0)), 2.0); gl_FragColor = vec4(0.85,0.72,0.38,1.0)*i; }`,
+          blending: THREE.AdditiveBlending, side: THREE.BackSide, transparent:true,
+        })
+      );
+      group.add(atmosphere);
+      group.add(earthMesh);
+    } else if (style === 'dotmatrix') {
+      // Dot matrix — ivory dots over land only; pure black sphere
+      const sphere = new THREE.Mesh(
+        new THREE.SphereGeometry(R*0.995, 64, 64),
+        new THREE.MeshBasicMaterial({ color: 0x0a0f1a })
+      );
+      group.add(sphere);
+
+      // sample lat/lon, check mask
+      const ctxSample = maskCanvas.getContext('2d');
+      drawEarth('#ffffff', '#000000');
+      const img = ctxSample.getImageData(0,0,1024,512);
+      const positions = [];
+      const rows = 120;
+      for (let i=1;i<rows;i++){
+        const phi = (i/rows)*Math.PI;
+        const circum = Math.sin(phi);
+        const cols = Math.max(6, Math.round(rows*2*circum));
+        for (let j=0;j<cols;j++){
+          const theta = (j/cols)*Math.PI*2;
+          const u = theta/(Math.PI*2);
+          const v = phi/Math.PI;
+          const px = Math.min(1023, Math.floor(u*1024));
+          const py = Math.min(511, Math.floor(v*512));
+          const idx = (py*1024+px)*4;
+          if (img.data[idx] > 128) {
+            const x = R*Math.sin(phi)*Math.cos(theta);
+            const y = R*Math.cos(phi);
+            const z = R*Math.sin(phi)*Math.sin(theta);
+            positions.push(x,y,z);
+          }
+        }
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions),3));
+      const pts = new THREE.Points(g, new THREE.PointsMaterial({
+        color: 0xf4ecd4, size: 0.018, sizeAttenuation: true,
+      }));
+      group.add(pts);
+
+      atmosphere = new THREE.Mesh(
+        new THREE.SphereGeometry(R*1.06, 64, 64),
+        new THREE.ShaderMaterial({
+          vertexShader:`varying vec3 vN; void main(){ vN = normalize(normalMatrix*normal); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
+          fragmentShader:`varying vec3 vN; void main(){ float i = pow(0.72 - dot(vN, vec3(0.,0.,1.)), 2.2); gl_FragColor = vec4(0.36,0.55,0.78,1.0)*i; }`,
+          blending: THREE.AdditiveBlending, side: THREE.BackSide, transparent:true,
+        })
+      );
+      group.add(atmosphere);
+    } else if (style === 'topo') {
+      // Topographic / vintage — cream continents with lat/lon grid + parchment feel
+      drawEarth('#e8dcb7', '#1f2a3a');
+      // add fine grid lines
+      mctx.strokeStyle = 'rgba(255,220,160,0.22)';
+      mctx.lineWidth = 1;
+      for (let lat=0; lat<=512; lat+=512/12){
+        mctx.beginPath(); mctx.moveTo(0,lat); mctx.lineTo(1024,lat); mctx.stroke();
+      }
+      for (let lon=0; lon<=1024; lon+=1024/24){
+        mctx.beginPath(); mctx.moveTo(lon,0); mctx.lineTo(lon,512); mctx.stroke();
+      }
+      const tex = new THREE.CanvasTexture(maskCanvas);
+      earthMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(R, 96, 96),
+        new THREE.MeshBasicMaterial({ map: tex })
+      );
+      group.add(earthMesh);
+
+      atmosphere = new THREE.Mesh(
+        new THREE.SphereGeometry(R*1.05, 64, 64),
+        new THREE.ShaderMaterial({
+          vertexShader:`varying vec3 vN; void main(){ vN = normalize(normalMatrix*normal); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
+          fragmentShader:`varying vec3 vN; void main(){ float i = pow(0.68 - dot(vN, vec3(0.,0.,1.)), 2.0); gl_FragColor = vec4(0.78,0.63,0.35,1.0)*i; }`,
+          blending: THREE.AdditiveBlending, side: THREE.BackSide, transparent:true,
+        })
+      );
+      group.add(atmosphere);
+    } else if (style === 'natgeo') {
+      // Nat Geo inspired — warm earth-tone continents, ocean parchment,
+      // subtle graticule, slight relief via sine-band shading, off-white labels vibe.
+      // Base parchment ocean
+      mctx.fillStyle = '#c9d4d8'; // muted parchment blue-grey ocean
+      mctx.fillRect(0,0,1024,512);
+
+      // Ocean texture — faint horizontal striations (bathymetry hint)
+      for (let y=0;y<512;y+=6){
+        mctx.fillStyle = `rgba(140,160,170,${0.04 + 0.03*Math.sin(y*0.07)})`;
+        mctx.fillRect(0,y,1024,2);
+      }
+
+      // Continents in varied earth tones per region — classic Nat Geo palette
+      const natGeoRegions = [
+        { poly: continents[0], fill:'#d9c79a' }, // N. America — wheat
+        { poly: continents[1], fill:'#c9a877' }, // S. America — ochre
+        { poly: continents[2], fill:'#d4bb8a' }, // Europe — sand
+        { poly: continents[3], fill:'#b89566' }, // Africa — terracotta sand
+        { poly: continents[4], fill:'#c6a877' }, // Asia — warm tan
+        { poly: continents[5], fill:'#b89763' }, // SE Asia
+        { poly: continents[6], fill:'#c49a66' }, // Australia — red ochre
+        { poly: continents[7], fill:'#e8ddc3' }, // Greenland — pale
+      ];
+      natGeoRegions.forEach(({ poly, fill }) => {
+        mctx.fillStyle = fill;
+        mctx.beginPath();
+        poly.forEach((p,i)=>{
+          const x=p[0]*1024, y=p[1]*512;
+          if (i===0) mctx.moveTo(x,y); else mctx.lineTo(x,y);
+        });
+        mctx.closePath();
+        mctx.fill();
+        // Hachure-style relief — subtle dark stippling inside continents
+        mctx.save();
+        mctx.clip();
+        mctx.fillStyle = 'rgba(90,60,30,0.08)';
+        for (let i=0;i<80;i++){
+          const rx = Math.random()*1024, ry = Math.random()*512;
+          mctx.fillRect(rx,ry,2,1);
+        }
+        mctx.restore();
+        // Coastline outline — darker, inked
+        mctx.strokeStyle = 'rgba(70,45,20,0.55)';
+        mctx.lineWidth = 1.5;
+        mctx.beginPath();
+        poly.forEach((p,i)=>{
+          const x=p[0]*1024, y=p[1]*512;
+          if (i===0) mctx.moveTo(x,y); else mctx.lineTo(x,y);
+        });
+        mctx.closePath();
+        mctx.stroke();
+      });
+
+      // Graticule — fine lat/lon grid in sepia
+      mctx.strokeStyle = 'rgba(90,65,30,0.20)';
+      mctx.lineWidth = 0.8;
+      for (let lat=0; lat<=512; lat+=512/18){
+        mctx.beginPath(); mctx.moveTo(0,lat); mctx.lineTo(1024,lat); mctx.stroke();
+      }
+      for (let lon=0; lon<=1024; lon+=1024/36){
+        mctx.beginPath(); mctx.moveTo(lon,0); mctx.lineTo(lon,512); mctx.stroke();
+      }
+      // Equator + tropics — thicker
+      mctx.strokeStyle = 'rgba(90,65,30,0.45)';
+      mctx.lineWidth = 1.2;
+      [256, 256*(1-23.5/90), 256*(1+23.5/90)].forEach(y=>{
+        mctx.beginPath(); mctx.moveTo(0,y); mctx.lineTo(1024,y); mctx.stroke();
+      });
+
+      const tex = new THREE.CanvasTexture(maskCanvas);
+      tex.anisotropy = 4;
+      earthMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(R, 96, 96),
+        new THREE.MeshBasicMaterial({ map: tex })
+      );
+      group.add(earthMesh);
+
+      // Warm atmospheric halo — golden honey
+      atmosphere = new THREE.Mesh(
+        new THREE.SphereGeometry(R*1.07, 64, 64),
+        new THREE.ShaderMaterial({
+          vertexShader:`varying vec3 vN; void main(){ vN = normalize(normalMatrix*normal); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
+          fragmentShader:`varying vec3 vN; void main(){ float i = pow(0.72 - dot(vN, vec3(0.,0.,1.)), 2.0); gl_FragColor = vec4(0.95,0.78,0.35,1.0)*i; }`,
+          blending: THREE.AdditiveBlending, side: THREE.BackSide, transparent:true,
+        })
+      );
+      group.add(atmosphere);
+    }
+
+    // Hotspot cluster — sample points for preview
+    const hotspots = [
+      [40,12],[35,139],[-22,-43],[48,2],[-34,151],[28,77],[30,31],[19,-99],[1,103],[-14,-76],
+      [41,29],[-1,36],[55,-3],[36,-6],[64,-22],[37,127],[25,55],[13,100],[33,-7],[-25,28],
+    ];
+    const hotspotGroup = new THREE.Group();
+    group.add(hotspotGroup);
+    const hotspotColor = style === 'natgeo' ? 0xffd100 : 0xf5c542;
+    hotspots.forEach((ll) => {
+      const [lat,lon] = ll;
+      const phi = (90-lat)*Math.PI/180;
+      const theta = (lon+180)*Math.PI/180;
+      const rr = R*1.005;
+      const x = rr*Math.sin(phi)*Math.cos(theta);
+      const y = rr*Math.cos(phi);
+      const z = rr*Math.sin(phi)*Math.sin(theta);
+
+      const core = new THREE.Mesh(
+        new THREE.SphereGeometry(0.012, 12, 12),
+        new THREE.MeshBasicMaterial({ color: hotspotColor })
+      );
+      core.position.set(x,y,z);
+      hotspotGroup.add(core);
+
+      const halo = new THREE.Mesh(
+        new THREE.SphereGeometry(0.025, 12, 12),
+        new THREE.MeshBasicMaterial({ color: hotspotColor, transparent:true, opacity:0.35 })
+      );
+      halo.position.set(x,y,z);
+      halo.userData.base = 0.025;
+      halo.userData.seed = Math.random()*Math.PI*2;
+      hotspotGroup.add(halo);
+    });
+
+    // Interaction — drag to rotate
+    let dragging=false, lx=0, ly=0, vx=0.003, vy=0;
+    const dom = renderer.domElement;
+    dom.style.cursor='grab';
+    dom.addEventListener('pointerdown', (e)=>{ dragging=true; lx=e.clientX; ly=e.clientY; dom.style.cursor='grabbing'; dom.setPointerCapture(e.pointerId); });
+    dom.addEventListener('pointermove', (e)=>{
+      if(!dragging)return;
+      const dx = (e.clientX-lx)*0.005;
+      const dy = (e.clientY-ly)*0.005;
+      group.rotation.y += dx;
+      group.rotation.x = Math.max(-1.2, Math.min(1.2, group.rotation.x+dy));
+      vx = dx*0.5; vy = dy*0.5;
+      lx=e.clientX; ly=e.clientY;
+    });
+    const endDrag=(e)=>{ dragging=false; dom.style.cursor='grab'; try{dom.releasePointerCapture(e.pointerId);}catch(err){} };
+    dom.addEventListener('pointerup', endDrag);
+    dom.addEventListener('pointercancel', endDrag);
+
+    let t0 = performance.now();
+    let raf;
+    function tick(){
+      const t = performance.now();
+      const dt = (t-t0)/1000; t0 = t;
+      if (!dragging){
+        group.rotation.y += 0.08*dt;
+      } else {
+        // inertia decay while dragging
+      }
+      // pulse halos
+      hotspotGroup.children.forEach((m,i)=>{
+        if (m.userData.base){
+          const s = 1 + 0.5*Math.sin(t*0.003 + m.userData.seed);
+          m.scale.setScalar(s);
+          m.material.opacity = 0.18 + 0.22*(1-Math.abs(Math.sin(t*0.003+m.userData.seed)));
+        }
+      });
+      dust.rotation.y -= 0.015*dt;
+      renderer.render(scene, camera);
+      raf = requestAnimationFrame(tick);
+    }
+    tick();
+
+    return ()=>{
+      cancelAnimationFrame(raf);
+      renderer.dispose();
+      if (dom.parentNode) dom.parentNode.removeChild(dom);
+    };
+  }, [width, height, style]);
+
+  return <div ref={mountRef} style={{ width, height }} />;
+}
+
+// Background style per artboard
+const STYLES = {
+  classic: {
+    bg: 'radial-gradient(ellipse at 50% 50%, #0f1a2e 0%, #070b14 70%, #03060c 100%)',
+    label:'Night Earth — Classic',
+    desc:'Ivory continents on deep navy oceans with a warm gold atmospheric halo. Our primary recommendation — reads instantly and leaves room for the moodboard to do the storytelling.',
+    fg:'#f4ecd4', accent:'#e8c77a',
+  },
+  dotmatrix: {
+    bg: 'radial-gradient(ellipse at 50% 50%, #0a0f1a 0%, #040608 80%)',
+    label:'Dotted Constellation',
+    desc:'Continents rendered as an ivory dot matrix over black glass. Cooler, more architectural — every hotspot reads as a constellation on its own star map.',
+    fg:'#e8eef7', accent:'#7fb0e8',
+  },
+  topo: {
+    bg: 'radial-gradient(ellipse at 50% 50%, #1a1510 0%, #0a0806 100%)',
+    label:'Cartographer\'s Globe',
+    desc:'Cream landmasses with a faint lat/lon graticule — the printed-atlas feel. Heritage + editorial. Leans National Geographic more than Condé Nast.',
+    fg:'#ead7ae', accent:'#c89850',
+  },
+  natgeo: {
+    bg: 'linear-gradient(180deg, #f6efe0 0%, #eadfbe 100%)',
+    label:'The Yellow Frame',
+    desc:'Earth-toned continents on a parchment ocean, fine graticule, hachure relief, and the iconic yellow border. Document-first — leans editorial-archive, feels like it belongs framed on a wall.',
+    fg:'#2a1e0a', accent:'#ffd100',
+    light: true,
+  },
+};
+
+function StyleCard({ styleKey, letter }){
+  const s = STYLES[styleKey];
+  const isNatGeo = styleKey === 'natgeo';
+  return (
+    <div style={{
+      width: 540, height: 640, background: s.bg, position:'relative', overflow:'hidden',
+      color: s.fg, fontFamily:"'Inter', sans-serif",
+      // Iconic yellow frame for Nat Geo
+      border: isNatGeo ? '14px solid #ffd100' : 'none',
+      boxSizing: 'border-box',
+    }}>
+      {/* top chrome */}
+      <div style={{
+        position:'absolute', top:0, left:0, right:0, padding:'20px 24px',
+        display:'flex', justifyContent:'space-between', alignItems:'center',
+        fontSize:10, letterSpacing:'0.25em', textTransform:'uppercase',
+        opacity: s.light ? 0.75 : 0.55, fontFamily:"'JetBrains Mono', monospace",
+      }}>
+        <span>— Atlas /50</span>
+        <span>{isNatGeo ? 'Vol. XXVI · No. 4' : 'Est. 2026'}</span>
+      </div>
+      {/* globe */}
+      <div style={{ position:'absolute', top: isNatGeo ? 54 : 60, left:'50%', transform:'translateX(-50%)'}}>
+        <Globe width={isNatGeo ? 460 : 480} height={isNatGeo ? 460 : 480} style={styleKey} />
+      </div>
+      {/* vignette */}
+      {!s.light && (
+        <div style={{
+          position:'absolute', inset:0, pointerEvents:'none',
+          background:`radial-gradient(ellipse at 50% 40%, transparent 45%, rgba(0,0,0,0.55) 95%)`,
+        }} />
+      )}
+      {/* bottom chrome */}
+      <div style={{
+        position:'absolute', bottom:0, left:0, right:0, padding:'22px 28px 26px',
+        borderTop: `1px solid ${s.accent}${s.light ? '' : '33'}`,
+        background: s.light ? 'rgba(246,239,224,0.92)' : 'transparent',
+      }}>
+        <div style={{fontSize:10, letterSpacing:'0.3em', opacity:0.6, fontFamily:"'JetBrains Mono', monospace"}}>
+          — OPTION {letter} ——————————
+        </div>
+        <div style={{
+          fontFamily:"'DM Serif Display', serif", fontSize:28, lineHeight:1.1, marginTop:6,
+          letterSpacing:-0.3,
+        }}>{s.label}</div>
+        <div style={{fontSize:13, lineHeight:1.55, opacity:0.75, marginTop:10, maxWidth:460}}>
+          {s.desc}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App(){
+  return (
+    <DesignCanvas minScale={0.3} maxScale={2}>
+      <div style={{ padding:'20px 60px 0'}}>
+        <div style={{ fontFamily:"'DM Serif Display', serif", fontSize: 44, color:'#2a2014', letterSpacing:-0.5 }}>
+          Atlas /50 — Globe Style Exploration
+        </div>
+        <div style={{ fontSize:15, color:'rgba(60,50,40,0.65)', marginTop:8, maxWidth:820, lineHeight:1.55 }}>
+          Three treatments for the core 3D globe, same geometry and hotspot logic underneath.
+          Drag any globe to rotate manually. Pick one and we'll build the full Condé Nast-style moodboard experience around it.
+        </div>
+        <div style={{ fontSize:12, color:'rgba(60,50,40,0.5)', marginTop:10, fontFamily:"'JetBrains Mono', monospace", letterSpacing:'0.1em' }}>
+          NIGHT-EARTH · EDITORIAL · 50 HOTSPOTS · FULL 3D · THREE.JS
+        </div>
+      </div>
+
+      <div style={{ display:'flex', gap:48, padding:'40px 60px 80px', alignItems:'flex-start', width:'max-content'}}>
+        <div style={{ position:'relative', flexShrink:0 }}>
+          <div style={{ fontSize:12, color:'rgba(60,50,40,0.7)', marginBottom:10, fontFamily:"'JetBrains Mono', monospace", letterSpacing:'0.15em'}}>OPTION · A</div>
+          <StyleCard styleKey="classic" letter="A" />
+        </div>
+        <div style={{ position:'relative', flexShrink:0 }}>
+          <div style={{ fontSize:12, color:'rgba(60,50,40,0.7)', marginBottom:10, fontFamily:"'JetBrains Mono', monospace", letterSpacing:'0.15em'}}>OPTION · B</div>
+          <StyleCard styleKey="dotmatrix" letter="B" />
+        </div>
+        <div style={{ position:'relative', flexShrink:0 }}>
+          <div style={{ fontSize:12, color:'rgba(60,50,40,0.7)', marginBottom:10, fontFamily:"'JetBrains Mono', monospace", letterSpacing:'0.15em'}}>OPTION · C</div>
+          <StyleCard styleKey="topo" letter="C" />
+        </div>
+        <div style={{ position:'relative', flexShrink:0 }}>
+          <div style={{ fontSize:12, color:'rgba(60,50,40,0.7)', marginBottom:10, fontFamily:"'JetBrains Mono', monospace", letterSpacing:'0.15em'}}>OPTION · D · NEW</div>
+          <StyleCard styleKey="natgeo" letter="D" />
+        </div>
+
+        <div style={{
+          width: 300, padding:'24px 26px', background:'#fef4a8',
+          fontFamily:'"Comic Sans MS", "Marker Felt", cursive', color:'#5a4a2a',
+          fontSize:14, lineHeight:1.5, transform:'rotate(-2deg)', alignSelf:'flex-start', marginTop: 30,
+          boxShadow:'0 2px 8px rgba(0,0,0,0.12)',
+        }}>
+          <b>Pick one</b> — then I'll build the full prototype:
+          parallax moodboards, wishlist, theme filters,
+          surprise-me, country list + search.
+          <br/><br/>
+          <i>Option D</i> is the new Nat Geo-inspired treatment —
+          earth tones + iconic yellow frame. A very different feel
+          from the dark night-earth options.
+        </div>
+      </div>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
