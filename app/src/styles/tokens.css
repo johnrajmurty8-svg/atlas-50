@@ -1,0 +1,71 @@
+:root {
+  /* Background */
+  --color-bg:             #050912;
+  --color-ocean:          #070f1f;
+
+  /* Text */
+  --color-cream:          #f4ecd4;
+  --color-cream-60:       rgba(255, 240, 220, 0.60);
+  --color-cream-45:       rgba(255, 220, 170, 0.45);
+  --color-cream-25:       rgba(255, 220, 170, 0.25);
+  --color-cream-15:       rgba(255, 220, 170, 0.15);
+  --color-cream-08:       rgba(255, 220, 170, 0.08);
+
+  /* Accent */
+  --color-accent:         #ffd100;
+
+  /* Overlays */
+  --color-overlay-dark:   rgba(7, 15, 31, 0.55);
+  --color-overlay-mid:    rgba(7, 15, 31, 0.75);
+  --color-overlay-heavy:  rgba(7, 15, 31, 0.92);
+  --color-white-85:       rgba(255, 255, 255, 0.85);
+
+  /* Continent fills (globe mesh) */
+  --continent-north-america: #d9c79a;
+  --continent-south-america: #c9a877;
+  --continent-europe:        #d4bb8a;
+  --continent-africa:        #b89566;
+  --continent-asia:          #c6a877;
+  --continent-se-asia:       #b89763;
+  --continent-australia:     #c49a66;
+  --continent-antarctica:    #e8ddc3;
+
+  /* Typography */
+  --font-serif:   'DM Serif Display', serif;
+  --font-sans:    'Inter', sans-serif;
+  --font-mono:    'JetBrains Mono', monospace;
+
+  /* Type scale */
+  --type-brand:         36px;
+  --type-hero-title:    42px;
+  --type-hover-name:    32px;
+  --type-moodboard-h1: 72px;
+  --type-list-name:     18px;
+  --type-wish-title:    28px;
+  --type-stat-value:    22px;
+  --type-body:          13px;
+  --type-label:         10px;
+  --type-chip:           9px;
+  --type-bar-label:      9px;
+  --type-nav:           12px;
+  --type-cta:           11px;
+
+  /* Spacing scale */
+  --space-xs:   6px;
+  --space-sm:  10px;
+  --space-md:  14px;
+  --space-lg:  22px;
+  --space-xl:  28px;
+  --space-2xl: 48px;
+
+  /* Layout measurements */
+  --masthead-height:     80px;
+  --left-panel-top:      130px;
+  --left-panel-left:      48px;
+  --left-panel-width:    360px;
+  --bottom-bar-bottom:    32px;
+  --right-panel-right:    48px;
+  --smart-picker-width:  220px;
+  --hover-card-width:    320px;
+  --wishlist-width:      380px;
+}
