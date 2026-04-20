@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import * as THREE from 'three';
 import { latLonToVec3 } from '../lib/globeUtils';
 import type { Destination, GlobeRef } from '../lib/types';
@@ -27,6 +27,7 @@ interface CultureGlobeProps {
 const CultureGlobe = forwardRef<GlobeRef, CultureGlobeProps>(
   function CultureGlobe({ destinations, visibleIds, onHover, onClick }, ref) {
     const mountRef = useRef<HTMLDivElement>(null);
+    const [webglFailed, setWebglFailed] = useState(false);
     const stateRef = useRef<{
       group?: THREE.Group;
       camera?: THREE.PerspectiveCamera;
@@ -55,7 +56,10 @@ const CultureGlobe = forwardRef<GlobeRef, CultureGlobeProps>(
       const mount = mountRef.current;
       if (!mount) return;
 
-      if (!window.WebGLRenderingContext) return;
+      if (!window.WebGLRenderingContext) {
+        setWebglFailed(true);
+        return;
+      }
 
       const W = mount.clientWidth;
       const H = mount.clientHeight;
@@ -68,6 +72,7 @@ const CultureGlobe = forwardRef<GlobeRef, CultureGlobeProps>(
       try {
         renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       } catch {
+        setWebglFailed(true);
         return;
       }
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -356,6 +361,29 @@ const CultureGlobe = forwardRef<GlobeRef, CultureGlobeProps>(
       };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [destinations]);
+
+    if (webglFailed) {
+      return (
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: '#050912',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div style={{
+            textAlign: 'center', padding: '0 40px',
+            fontFamily: 'var(--font-mono)', fontSize: 12,
+            letterSpacing: '0.25em', color: 'rgba(255,220,170,0.55)',
+            lineHeight: 1.8,
+          }}>
+            <div style={{ fontSize: 36, marginBottom: 20, fontFamily: 'var(--font-serif)', color: '#fff' }}>
+              Atlas<span style={{ color: '#ffd100' }}>/</span>50
+            </div>
+            Your browser doesn&apos;t support WebGL.<br />
+            Atlas /50 requires a modern browser.
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div

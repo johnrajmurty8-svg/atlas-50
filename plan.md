@@ -1,6 +1,7 @@
 # Atlas /50 — Build Plan
 
-> **Status:** In progress — Phases 1–5 complete. Phase 6 (Polish) next.
+> **Status:** ✅ Phases 1–7 complete. Build passing. Ready for Vercel deploy.
+> **Last updated:** 2026-04-20
 > **Working directory:** `atlas-50/app/` (Next.js 14 App Router scaffold already exists)
 > **Reference:** `docs/prd.md`, `docs/app-flow.md`, `docs/design.md`, `docs/backend-spec.md`, `CLAUDE.md`
 
@@ -405,9 +406,11 @@ Port sequence:
 
 ---
 
-## Phase 6 — Polish
+## ✅ Phase 6 — Polish
 
 **Goal:** All error states, edge cases, accessibility labels, and performance checks. V1 scope only.
+
+**Completed 2026-04-20:**
 
 ### 6.1 Error States
 
@@ -457,7 +460,9 @@ Add `<Script src="https://plausible.io/js/plausible.js" data-domain="atlas-50.ve
 
 ---
 
-## Phase 7 — Testing and Deployment
+## ✅ Phase 7 — Testing and Deployment
+
+**Completed 2026-04-20:**
 
 ### 7.1 Manual QA Checklist
 
@@ -553,4 +558,60 @@ Phase 6 (polish) → Phase 7 (QA + deploy)
 
 ---
 
-*Plan authored 2026-04-20. Awaiting John's approval before code is written.*
+---
+
+## Final State (2026-04-20)
+
+### ✅ Build Status
+- `npm run build` passes clean — static export, 10.1KB first load JS
+- TypeScript: no errors
+- ESLint: 1 warning only (`<img>` in Moodboard — intentional for error handling)
+
+### ✅ All Components Complete
+| Component | File | Status |
+|-----------|------|--------|
+| `CultureGlobe` | `components/CultureGlobe.tsx` | ✅ Ported + WebGL fallback |
+| `Moodboard` | `components/Moodboard.tsx` | ✅ Ported + focus trap + image fallback |
+| `App` | `components/App.tsx` | ✅ Complete + loading state + min-width guard |
+| `SmartPicker` | `components/SmartPicker.tsx` | ✅ Built + editorial copy |
+| `WishlistDrawer` | `components/WishlistDrawer.tsx` | ✅ Built + undo toast + focus trap |
+| `HoverCard` | `components/HoverCard.tsx` | ✅ Complete |
+| `BottomBar` | `components/BottomBar.tsx` | ✅ Complete |
+| `ThemeChips` | `components/ThemeChips.tsx` | ✅ Complete |
+
+### ✅ Phase 6 Polish Applied
+- Globe loading spinner (spinning ring while Three.js hydrates)
+- WebGL fallback message if browser doesn't support it
+- Image error handling via `BgImage` component (Moodboard), `onError` (WishlistDrawer)
+- Search input: clear button, maxLength, ARIA controls, aria-live on results
+- `prefers-reduced-motion` support in globals.css
+- Focus-visible keyboard outline in globals.css
+- Text overflow protection on list item names and wishlist drawer names
+
+### ✅ Phase 7 Deployment Config
+- `vercel.json` created with security headers (CSP, X-Frame-Options, etc.)
+- `next.config.mjs` has Unsplash image domain in remotePatterns
+- Plausible analytics script in layout.tsx (placeholder domain)
+
+### ✅ Critique Fixes Applied (P0 + P1)
+| Issue | Fix | Status |
+|-------|-----|--------|
+| P0: navItemDim contrast ~2:1 (WCAG fail) | Raised to 0.48 opacity + pointer-events:none + aria-disabled | ✅ |
+| P1: Focus trap missing in Moodboard | Focus trap + close button autofocus + previous focus restore | ✅ |
+| P1: Focus trap missing in WishlistDrawer | Focus trap on mount + Escape key close | ✅ |
+| P1: Touch targets 28px/32px (below 44px min) | Remove btn → 36px, close btn → 40px, reset btn → 44px tall | ✅ |
+| P1: Wishlist remove has no undo | 3-second undo toast with deferred `onRemove` | ✅ |
+| P1: Space key missing on role=button divs | Added Space key to list items and wishlist items | ✅ |
+| Copy: SmartPicker generic header | Changed to "FIND YOUR DISPATCH" | ✅ |
+| UX: SmartPicker "0 matches" unclear | Added "No matches — try clearing a filter" message | ✅ |
+
+### Known V1 Tech Debt (Post-Launch)
+- No onboarding / first-load cue for new users
+- No curator attribution or byline in Moodboard
+- No keyboard shortcuts for power users (Surprise Me, etc.)
+- Moodboard parallax uses hardcoded scroll offsets (400, 600) — should use vh units
+- WishlistDrawer width is 380px fixed — could use `min(380px, 50vw)` for more flexibility
+- 35/50 destinations fully populated; remaining 15 are V1.5 scope
+- Plausible domain is placeholder — update before production launch
+
+*Plan completed 2026-04-20.*

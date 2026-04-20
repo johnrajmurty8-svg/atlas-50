@@ -10,9 +10,67 @@ interface MoodboardProps {
   onClose: () => void;
 }
 
+function useImageFallback(src: string) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => { setFailed(false); }, [src]);
+  const onError = () => setFailed(true);
+  return { src: failed ? '' : src, onError, failed };
+}
+
+function BgImage({ src, style }: { src: string; style: React.CSSProperties }) {
+  const { src: safeSrc, onError } = useImageFallback(src);
+  // eslint-disable-next-line @next/next/no-img-element
+  return (
+    <img
+      src={safeSrc}
+      onError={onError}
+      alt=""
+      aria-hidden="true"
+      style={{
+        position: 'absolute', inset: 0,
+        width: '100%', height: '100%',
+        objectFit: 'cover',
+        ...style,
+      }}
+    />
+  );
+}
+
 export default function Moodboard({ destination, isWished, onToggleWish, onClose }: MoodboardProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
   const [scroll, setScroll] = useState(0);
+  const prevFocusRef = useRef<HTMLElement | null>(null);
+
+  // Focus trap + restore previous focus on close
+  useEffect(() => {
+    prevFocusRef.current = document.activeElement as HTMLElement;
+    closeBtnRef.current?.focus();
+
+    const root = rootRef.current;
+    if (!root) return;
+
+    const trap = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const items = Array.from(root.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, [tabindex]:not([tabindex="-1"])'
+      ));
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last?.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first?.focus(); }
+      }
+    };
+
+    document.addEventListener('keydown', trap);
+    return () => {
+      document.removeEventListener('keydown', trap);
+      prevFocusRef.current?.focus();
+    };
+  }, []);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -38,10 +96,10 @@ export default function Moodboard({ destination, isWished, onToggleWish, onClose
   const frameY = -scroll * 0.15;
 
   return (
-    <div style={styles.root}>
+    <div ref={rootRef} style={styles.root} role="dialog" aria-modal="true" aria-label={`${destination.name} — destination dispatch`}>
       <div style={{ ...styles.frame, transform: `translateY(${frameY * 0.2}px)` }} />
 
-      <button style={styles.closeBtn} onClick={onClose} aria-label="Close moodboard">
+      <button ref={closeBtnRef} style={styles.closeBtn} onClick={onClose} aria-label="Close moodboard">
         <svg width="18" height="18" viewBox="0 0 18 18">
           <path d="M3 3L15 15M15 3L3 15" stroke="currentColor" strokeWidth="1.5" />
         </svg>
@@ -63,12 +121,13 @@ export default function Moodboard({ destination, isWished, onToggleWish, onClose
       <div ref={scrollRef} style={styles.scroll}>
         {/* HERO */}
         <section style={styles.hero}>
-          <div style={{
-            position: 'absolute', inset: 0,
-            transform: `translateY(${heroY}px) scale(${heroScale})`,
-            backgroundImage: `url(${images[0]})`,
-            backgroundSize: 'cover', backgroundPosition: 'center',
-          }} />
+          <BgImage
+            src={images[0]}
+            style={{
+              transform: `translateY(${heroY}px) scale(${heroScale})`,
+              transformOrigin: 'center',
+            }}
+          />
           <div style={{
             position: 'absolute', inset: 0,
             background: 'linear-gradient(180deg, rgba(7,15,31,0.35) 0%, rgba(7,15,31,0) 40%, rgba(7,15,31,0.85) 100%)',
@@ -98,7 +157,7 @@ export default function Moodboard({ destination, isWished, onToggleWish, onClose
             <div style={{ ...styles.bentoCell, gridColumn: 'span 7', gridRow: 'span 2' }}>
               <div style={styles.sectionLabel}>— THE OPENING</div>
               <p style={styles.pull}>{destination.tagline}</p>
-              <p style={styles.body}>{destination.blurb}</p>
+              {destination.blurb && <p style={styles.body}>{destination.blurb}</p>}
             </div>
             <div style={{ ...styles.bentoCell, ...styles.accentCell, gridColumn: 'span 5' }}>
               <div style={styles.sectionLabel}>— CLIMATE</div>
@@ -124,16 +183,12 @@ export default function Moodboard({ destination, isWished, onToggleWish, onClose
             <div style={styles.sectionTitle}>Landscape &amp; light</div>
           </div>
           <div style={styles.diptych}>
-            <div style={{
-              ...styles.diptychImg,
-              backgroundImage: `url(${images[1]})`,
-              transform: `translateY(${Math.max(-40, (scroll - 600) * -0.05)}px)`,
-            }} />
-            <div style={{
-              ...styles.diptychImg,
-              backgroundImage: `url(${images[2]})`,
-              transform: `translateY(${Math.max(-40, (scroll - 600) * -0.08)}px)`,
-            }} />
+            <div style={{ ...styles.diptychImg, position: 'relative', overflow: 'hidden', transform: `translateY(${Math.max(-40, (scroll - 600) * -0.05)}px)` }}>
+              <BgImage src={images[1]} style={{}} />
+            </div>
+            <div style={{ ...styles.diptychImg, position: 'relative', overflow: 'hidden', transform: `translateY(${Math.max(-40, (scroll - 600) * -0.08)}px)` }}>
+              <BgImage src={images[2]} style={{}} />
+            </div>
           </div>
         </section>
 
@@ -154,12 +209,13 @@ export default function Moodboard({ destination, isWished, onToggleWish, onClose
         </section>
 
         {/* FULL-BLEED */}
-        <section style={{ ...styles.fullBleed, backgroundImage: `url(${images[3]})` }}>
+        <section style={{ ...styles.fullBleed, backgroundColor: '#050912' }}>
+          <BgImage src={images[3]} style={{ zIndex: 0 }} />
           <div style={{
-            position: 'absolute', inset: 0,
+            position: 'absolute', inset: 0, zIndex: 1,
             background: 'linear-gradient(180deg, rgba(7,15,31,0.2), rgba(7,15,31,0.7))',
           }} />
-          <div style={styles.fullBleedCopy}>
+          <div style={{ ...styles.fullBleedCopy, zIndex: 2 }}>
             <div style={styles.sectionLabel}>— SOUNDTRACK</div>
             <div style={styles.playlist}>
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#ffd100" strokeWidth="1.2" style={{ marginRight: 10 }}>
@@ -174,9 +230,15 @@ export default function Moodboard({ destination, isWished, onToggleWish, onClose
 
         {/* TRIPTYCH */}
         <section style={styles.triptych}>
-          <div style={{ ...styles.triCell, backgroundImage: `url(${images[3]})` }} />
-          <div style={{ ...styles.triCell, backgroundImage: `url(${images[4]})` }} />
-          <div style={{ ...styles.triCell, backgroundImage: `url(${images[5] || images[0]})` }} />
+          <div style={{ ...styles.triCell, position: 'relative', overflow: 'hidden' }}>
+            <BgImage src={images[3]} style={{}} />
+          </div>
+          <div style={{ ...styles.triCell, position: 'relative', overflow: 'hidden' }}>
+            <BgImage src={images[4] || images[0]} style={{}} />
+          </div>
+          <div style={{ ...styles.triCell, position: 'relative', overflow: 'hidden' }}>
+            <BgImage src={images[5] || images[1] || images[0]} style={{}} />
+          </div>
         </section>
 
         {/* FOOTER */}

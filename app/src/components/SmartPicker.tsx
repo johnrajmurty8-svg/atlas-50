@@ -95,7 +95,7 @@ export default function SmartPicker({ picker, onChange, filtered }: SmartPickerP
 
   return (
     <div style={styles.panel}>
-      <div style={styles.header}>LET US HELP YOU PICK</div>
+      <div style={styles.header}>FIND YOUR DISPATCH</div>
 
       {FIELDS.map(field => {
         const val = picker[field.key];
@@ -138,7 +138,10 @@ export default function SmartPicker({ picker, onChange, filtered }: SmartPickerP
       {active && (
         <div style={styles.resultCount}>
           <span style={styles.resultLabel}>CUSTOM LIST</span>
-          <span style={styles.resultNum}>{filtered.length} matches</span>
+          {filtered.length > 0
+            ? <span style={styles.resultNum}>{filtered.length} {filtered.length === 1 ? 'destination' : 'destinations'}</span>
+            : <span style={{ ...styles.resultNum, fontStyle: 'italic', opacity: 0.7 }}>No matches — try clearing a filter</span>
+          }
         </div>
       )}
     </div>
@@ -187,7 +190,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   resetBtn: {
     marginTop: 10,
-    width: '100%', padding: '8px 0',
+    width: '100%', padding: '14px 0',
     background: 'transparent',
     border: '1px solid rgba(255,220,170,0.20)',
     color: 'rgba(255,240,220,0.50)',

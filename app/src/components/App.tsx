@@ -11,7 +11,27 @@ import WishlistDrawer from './WishlistDrawer';
 import SmartPicker from './SmartPicker';
 import Moodboard from './Moodboard';
 
-const CultureGlobe = dynamic(() => import('./CultureGlobe'), { ssr: false });
+const GlobeLoading = () => (
+  <div style={{
+    position: 'absolute', inset: 0,
+    background: 'radial-gradient(ellipse at 60% 50%, #0a1324 0%, #050912 60%, #020408 100%)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  }}>
+    <div style={{
+      width: 48, height: 48,
+      border: '1px solid rgba(255,220,170,0.20)',
+      borderTopColor: '#ffd100',
+      borderRadius: '50%',
+      animation: 'globeSpin 1.1s linear infinite',
+    }} />
+    <style>{`@keyframes globeSpin { to { transform: rotate(360deg); } }`}</style>
+  </div>
+);
+
+const CultureGlobe = dynamic(() => import('./CultureGlobe'), {
+  ssr: false,
+  loading: GlobeLoading,
+});
 
 const STORAGE_KEY = 'atlas50-wish';
 const REGIONS = ['Europe', 'Asia', 'Africa', 'Americas', 'Oceania'];
@@ -143,9 +163,9 @@ export default function App({ destinations }: AppProps) {
         </div>
         <nav style={styles.nav}>
           <span style={styles.navItem}>— The Index</span>
-          <span title="Coming Soon" style={{ ...styles.navItem, ...styles.navItemDim }}>Dispatches</span>
-          <span title="Coming Soon" style={{ ...styles.navItem, ...styles.navItemDim }}>Journal</span>
-          <span title="Coming Soon" style={{ ...styles.navItem, ...styles.navItemDim }}>Sign In</span>
+          <span title="Coming Soon" style={{ ...styles.navItem, ...styles.navItemDim }} aria-disabled="true" role="link">Dispatches</span>
+          <span title="Coming Soon" style={{ ...styles.navItem, ...styles.navItemDim }} aria-disabled="true" role="link">Journal</span>
+          <span title="Coming Soon" style={{ ...styles.navItem, ...styles.navItemDim }} aria-disabled="true" role="link">Sign In</span>
         </nav>
       </header>
 
@@ -160,23 +180,37 @@ export default function App({ destinations }: AppProps) {
           </p>
         </div>
 
-        <div style={styles.searchRow}>
-          <svg width="14" height="14" viewBox="0 0 14 14" style={{ opacity: 0.5, flexShrink: 0 }}>
+        <div style={styles.searchRow} role="search">
+          <svg width="14" height="14" viewBox="0 0 14 14" style={{ opacity: 0.5, flexShrink: 0 }} aria-hidden="true">
             <circle cx="6" cy="6" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.2" />
             <path d="M9.5 9.5 L13 13" stroke="currentColor" strokeWidth="1.2" />
           </svg>
           <input
+            id="destination-search"
             style={styles.searchInput}
             placeholder="Search country or region…"
             value={search}
             onChange={e => setSearch(e.target.value)}
             aria-label="Search destinations"
+            aria-controls="destination-list"
+            maxLength={80}
+            autoComplete="off"
+            spellCheck={false}
           />
+          {search && (
+            <button
+              style={styles.searchClear}
+              onClick={() => setSearch('')}
+              aria-label="Clear search"
+            >
+              ×
+            </button>
+          )}
         </div>
 
         <ThemeChips activeTheme={activeTheme} onChange={setActiveTheme} />
 
-        <div style={styles.listScroll}>
+        <div id="destination-list" style={styles.listScroll} aria-live="polite" aria-atomic="false">
           {REGIONS.map(region => {
             const items = filtered.filter(d => d.region === region);
             if (!items.length) return null;
@@ -196,7 +230,7 @@ export default function App({ destinations }: AppProps) {
                         onMouseEnter={() => setHovered(dest)}
                         onMouseLeave={() => setHovered(null)}
                         onClick={() => handleListClick(dest)}
-                        onKeyDown={e => e.key === 'Enter' && handleListClick(dest)}
+                        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleListClick(dest); } }}
                         tabIndex={0}
                         role="button"
                         aria-label={`View ${dest.name}`}
@@ -296,8 +330,9 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'var(--font-sans)',
   },
   navItemDim: {
-    color: 'rgba(255,240,220,0.35)',
-    cursor: 'default',
+    color: 'rgba(255,240,220,0.48)',
+    cursor: 'not-allowed',
+    pointerEvents: 'none',
   },
 
   leftPanel: {
@@ -334,6 +369,12 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#f4ecd4', fontSize: 13,
     fontFamily: 'var(--font-sans)',
   },
+  searchClear: {
+    background: 'transparent', border: 'none',
+    color: 'rgba(255,220,170,0.50)', fontSize: 18,
+    cursor: 'pointer', padding: '0 2px', lineHeight: 1,
+    display: 'flex', alignItems: 'center',
+  },
 
   listScroll: { flex: 1, overflowY: 'auto', paddingRight: 8 },
   regionBlock: { marginBottom: 20 },
@@ -356,6 +397,8 @@ const styles: Record<string, React.CSSProperties> = {
   listName: {
     fontFamily: 'var(--font-serif)', fontSize: 18,
     color: '#fff', flex: 1, letterSpacing: -0.2,
+    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+    minWidth: 0,
   },
   listMeta: {
     fontFamily: 'var(--font-mono)', fontSize: 9,
