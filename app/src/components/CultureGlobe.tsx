@@ -2,20 +2,11 @@
 
 import { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import * as THREE from 'three';
+import * as d3 from 'd3-geo';
+import * as topojson from 'topojson-client';
+import type { Topology } from 'topojson-specification';
 import { latLonToVec3 } from '../lib/globeUtils';
 import type { Destination, GlobeRef } from '../lib/types';
-
-const CONTINENTS = [
-  [[0.10,0.18],[0.18,0.16],[0.25,0.22],[0.28,0.32],[0.22,0.42],[0.16,0.46],[0.12,0.40],[0.08,0.30]],
-  [[0.24,0.52],[0.30,0.52],[0.33,0.62],[0.30,0.76],[0.26,0.80],[0.22,0.70],[0.22,0.58]],
-  [[0.47,0.24],[0.55,0.22],[0.56,0.30],[0.50,0.34],[0.46,0.32]],
-  [[0.48,0.36],[0.56,0.36],[0.60,0.46],[0.56,0.62],[0.50,0.68],[0.46,0.60],[0.46,0.44]],
-  [[0.56,0.22],[0.78,0.20],[0.85,0.30],[0.82,0.42],[0.70,0.46],[0.62,0.42],[0.58,0.32]],
-  [[0.74,0.46],[0.82,0.48],[0.84,0.56],[0.76,0.56]],
-  [[0.80,0.60],[0.88,0.60],[0.90,0.68],[0.84,0.72],[0.78,0.68]],
-  [[0.40,0.08],[0.46,0.08],[0.47,0.16],[0.42,0.18]],
-];
-const FILLS = ['#d9c79a','#c9a877','#d4bb8a','#b89566','#c6a877','#b89763','#c49a66','#e8ddc3'];
 
 interface CultureGlobeProps {
   destinations: Destination[];
@@ -31,6 +22,15 @@ const CultureGlobe = forwardRef<GlobeRef, CultureGlobeProps>(
     const [webglFailed, setWebglFailed] = useState(false);
     const spinSpeedRef = useRef(spinSpeed);
     useEffect(() => { spinSpeedRef.current = spinSpeed; }, [spinSpeed]);
+
+    const worldRef = useRef<Topology | null>(null);
+    const [worldReady, setWorldReady] = useState(false);
+    useEffect(() => {
+      fetch('/data/countries-110m.json')
+        .then(r => r.json())
+        .then((data: Topology) => { worldRef.current = data; setWorldReady(true); })
+        .catch(() => { setWorldReady(true); }); // fall through gracefully if fetch fails
+    }, []);
 
     const stateRef = useRef<{
       group?: THREE.Group;
@@ -102,36 +102,71 @@ const CultureGlobe = forwardRef<GlobeRef, CultureGlobeProps>(
         ctx.fillRect(0, y, 2048, 3);
       }
 
-      CONTINENTS.forEach((poly, idx) => {
-        ctx.fillStyle = FILLS[idx % FILLS.length];
-        ctx.beginPath();
-        poly.forEach((p, i) => {
-          const x = p[0] * 2048, y = p[1] * 1024;
-          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-        });
-        ctx.closePath();
-        ctx.fill();
-        ctx.save();
-        ctx.clip();
-        ctx.fillStyle = 'rgba(90,60,30,0.10)';
-        for (let i = 0; i < 180; i++) {
-          ctx.fillRect(Math.random() * 2048, Math.random() * 1024, 2, 1);
+      if (worldRef.current) {
+        const world = worldRef.current;
+        const land = topojson.feature(world, (world as any).objects.land);
+
+        // Draw continents onto a temp canvas using standard equirectangular
+        // (x=0 → lon=-180°, increasing eastward), then copy to the main canvas
+        // with a mirror+offset transform so the result matches Three.js
+        // SphereGeometry UV convention (u=0 → lon=0°, increasing westward).
+        //
+        // Two-pass copy:  x_main = (3072 - x_tmp) mod 2048
+        //   Pass 1: setTransform(-1,0,0,1,3072,0) → covers canvas x=[1024,2048]
+        //   Pass 2: setTransform(-1,0,0,1,1024,0) → covers canvas x=[0,1024]
+        const tmp = document.createElement('canvas');
+        tmp.width = 2048; tmp.height = 1024;
+        const tc = tmp.getContext('2d')!;
+
+        const projection = d3.geoEquirectangular()
+          .scale(2048 / (2 * Math.PI))
+          .translate([1024, 512]);
+        const path = d3.geoPath(projection, tc);
+
+        // Base continent fill
+        tc.fillStyle = '#c9b99a';
+        tc.beginPath(); path(land); tc.fill();
+
+        // Hand-sketched texture (hatching + stipple, clipped to land)
+        tc.save();
+        tc.beginPath(); path(land); tc.clip();
+        tc.strokeStyle = 'rgba(80,55,20,0.07)';
+        tc.lineWidth = 0.8;
+        tc.beginPath();
+        for (let i = -1024; i < 3072; i += 9) {
+          tc.moveTo(i, 0); tc.lineTo(i + 1024, 1024);
         }
-        ctx.fillStyle = 'rgba(255,240,200,0.06)';
-        for (let i = 0; i < 80; i++) {
-          ctx.fillRect(Math.random() * 2048, Math.random() * 1024, 2, 1);
+        tc.stroke();
+        tc.fillStyle = 'rgba(70,45,15,0.10)';
+        for (let i = 0; i < 3000; i++) {
+          tc.fillRect(Math.random() * 2048, Math.random() * 1024, 1, 1);
         }
-        ctx.restore();
-        ctx.strokeStyle = 'rgba(255,220,170,0.55)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        poly.forEach((p, i) => {
-          const x = p[0] * 2048, y = p[1] * 1024;
-          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-        });
-        ctx.closePath();
-        ctx.stroke();
-      });
+        tc.restore();
+
+        // Biome lat-band overlays (clipped to land)
+        tc.save();
+        tc.beginPath(); path(land); tc.clip();
+        tc.fillStyle = 'rgba(230,220,200,0.18)';
+        tc.fillRect(0, 0, 2048, 142); tc.fillRect(0, 882, 2048, 142);
+        tc.fillStyle = 'rgba(195,155,70,0.22)';
+        tc.fillRect(0, 330, 2048, 97);
+        tc.fillStyle = 'rgba(60,50,20,0.15)';
+        tc.fillRect(0, 444, 2048, 136);
+        tc.fillStyle = 'rgba(195,155,70,0.18)';
+        tc.fillRect(0, 597, 2048, 97);
+        tc.restore();
+
+        // Coastline stroke
+        tc.strokeStyle = 'rgba(255,220,170,0.55)';
+        tc.lineWidth = 2;
+        tc.beginPath(); path(land); tc.stroke();
+
+        // Copy to main canvas shifted by 1024px (180° longitude) so the seam
+        // moves from canvas-center to canvas-edge, matching Three.js UV.
+        // No mirror — continent shapes preserve their natural orientation.
+        ctx.drawImage(tmp, -1024, 0);
+        ctx.drawImage(tmp, 1024, 0);
+      }
 
       ctx.strokeStyle = 'rgba(255,220,170,0.10)';
       ctx.lineWidth = 1;
@@ -364,7 +399,7 @@ const CultureGlobe = forwardRef<GlobeRef, CultureGlobeProps>(
         if (dom.parentNode) dom.parentNode.removeChild(dom);
       };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [destinations]);
+    }, [destinations, worldReady]);
 
     if (webglFailed) {
       return (

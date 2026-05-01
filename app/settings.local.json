@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(unzip -o \"atlas html.zip\" -d atlas_html_extracted)",
+      "Bash(git -C \"c:/Users/johnr/OneDrive/Desktop/AI Projects/atlas-50\" init)"
+    ]
+  }
+}

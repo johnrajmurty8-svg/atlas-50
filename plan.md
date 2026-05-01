@@ -1,6 +1,6 @@
 # Atlas /50 — Build Plan
 
-> **Status:** ✅ Phases 1–7 complete. Build passing. Ready for Vercel deploy.
+> **Status:** ✅ Phases 1–7 complete. Pushed to main (commit `1f7604e`). Vercel deploy triggered 2026-04-20.
 > **Last updated:** 2026-04-20
 > **Working directory:** `atlas-50/app/` (Next.js 14 App Router scaffold already exists)
 > **Reference:** `docs/prd.md`, `docs/app-flow.md`, `docs/design.md`, `docs/backend-spec.md`, `CLAUDE.md`
@@ -555,8 +555,6 @@ Phase 5.7–5.8 (wishlist, smart picker) → verify filtering
 Phase 5.9 (moodboard) → verify full flow end-to-end
 Phase 6 (polish) → Phase 7 (QA + deploy)
 ```
-
----
 
 ---
 
