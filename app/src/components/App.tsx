@@ -1,7 +1,6 @@
 'use client';
 
 import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
-import dynamic from 'next/dynamic';
 import type { Destination, SmartPickerState, GlobeRef } from '../lib/types';
 import { filterDestinations } from '../lib/filterUtils';
 import ThemeChips from './ThemeChips';
@@ -10,6 +9,7 @@ import BottomBar from './BottomBar';
 import WishlistDrawer from './WishlistDrawer';
 import SmartPicker from './SmartPicker';
 import Moodboard from './Moodboard';
+import CultureGlobe from './CultureGlobe';
 
 const GlobeLoading = () => (
   <div style={{
@@ -28,11 +28,6 @@ const GlobeLoading = () => (
   </div>
 );
 
-const CultureGlobe = dynamic(() => import('./CultureGlobe'), {
-  ssr: false,
-  loading: GlobeLoading,
-});
-
 const STORAGE_KEY = 'atlas50-wish';
 const REGIONS = ['Europe', 'Asia', 'Africa', 'Americas', 'Oceania'];
 
@@ -50,14 +45,25 @@ export default function App({ destinations }: AppProps) {
     typeof window !== 'undefined' ? window.innerWidth : 1440
   );
 
-  const [wishlist, setWishlist] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
-    catch { return []; }
-  });
+  const [wishlist, setWishlist] = useState<string[]>([]);
+  const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
+  const [spinSpeed, setSpinSpeed] = useState(0.0336);
+  const [clientReady, setClientReady] = useState(false);
+  const [hoveredListId, setHoveredListId] = useState<string | null>(null);
 
   const [picker, setPicker] = useState<SmartPickerState>({
     vibe: '', cost: '', season: '', environment: '', theme: '', groupSize: '',
   });
+
+  useEffect(() => setClientReady(true), []);
+
+  // Load wishlist from localStorage after hydration to avoid server/client mismatch
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      if (stored.length) setWishlist(stored);
+    } catch { /* noop */ }
+  }, []);
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(wishlist)); }
@@ -87,7 +93,7 @@ export default function App({ destinations }: AppProps) {
 
   const handleListClick = useCallback((dest: Destination) => {
     handleFly(dest);
-    setTimeout(() => setSelected(dest), 700);
+    setTimeout(() => setSelected(dest), 1500);
   }, [handleFly]);
 
   const handleGlobeClick = useCallback((dest: Destination) => {
@@ -140,16 +146,21 @@ export default function App({ destinations }: AppProps) {
   }
 
   return (
-    <div style={styles.root}>
+    <div style={styles.root} onMouseMove={(e) => setHoverPos({ x: e.clientX, y: e.clientY })}>
       {/* Globe canvas layer */}
       <div style={styles.globeWrap}>
-        <CultureGlobe
-          ref={globeRef}
-          destinations={destinations}
-          visibleIds={visibleIds}
-          onHover={setHovered}
-          onClick={handleGlobeClick}
-        />
+        {clientReady ? (
+          <CultureGlobe
+            ref={globeRef}
+            destinations={destinations}
+            visibleIds={visibleIds}
+            onHover={setHovered}
+            onClick={handleGlobeClick}
+            spinSpeed={spinSpeed}
+          />
+        ) : (
+          <GlobeLoading />
+        )}
         <div style={styles.vignette} />
       </div>
 
@@ -227,8 +238,8 @@ export default function App({ destinations }: AppProps) {
                       <li
                         key={dest.id}
                         style={styles.listItem}
-                        onMouseEnter={() => setHovered(dest)}
-                        onMouseLeave={() => setHovered(null)}
+                        onMouseEnter={() => setHoveredListId(dest.id)}
+                        onMouseLeave={() => setHoveredListId(null)}
                         onClick={() => handleListClick(dest)}
                         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleListClick(dest); } }}
                         tabIndex={0}
@@ -236,7 +247,11 @@ export default function App({ destinations }: AppProps) {
                         aria-label={`View ${dest.name}`}
                       >
                         <span style={styles.listNum}>{String(globalIdx + 1).padStart(2, '0')}</span>
-                        <span style={styles.listName}>{dest.name}</span>
+                        <span style={{
+                          ...styles.listName,
+                          color: hoveredListId === dest.id ? 'rgba(255,209,0,0.75)' : '#fff',
+                          transition: 'color 0.12s ease',
+                        }}>{dest.name}</span>
                         <span style={styles.listMeta}>{dest.themes[0]}</span>
                         {inWish && <span style={styles.listWish} aria-label="Saved">✦</span>}
                       </li>
@@ -257,7 +272,7 @@ export default function App({ destinations }: AppProps) {
 
       {/* Hover card — only when no moodboard open */}
       {hovered && !selected && (
-        <HoverCard destination={hovered} />
+        <HoverCard destination={hovered} x={hoverPos.x} y={hoverPos.y} />
       )}
 
       {/* Wishlist drawer */}
@@ -289,13 +304,29 @@ export default function App({ destinations }: AppProps) {
           onClose={handleMoodboardClose}
         />
       )}
+
+      {/* Globe spin speed control */}
+      <div style={styles.spinControl}>
+        <label htmlFor="spin-speed" style={styles.spinLabel}>SPIN SPEED</label>
+        <input
+          id="spin-speed"
+          type="range"
+          min={0}
+          max={0.24}
+          step={0.001}
+          value={spinSpeed}
+          onChange={e => setSpinSpeed(Number(e.target.value))}
+          style={styles.spinRange}
+          aria-label="Globe spin speed"
+        />
+      </div>
     </div>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
   root: {
-    position: 'fixed', inset: 0, overflow: 'hidden',
+    position: 'fixed', inset: 24, overflow: 'hidden',
     background: 'radial-gradient(ellipse at 60% 50%, #0a1324 0%, #050912 60%, #020408 100%)',
     color: '#f4ecd4',
     fontFamily: 'var(--font-sans)',
@@ -411,6 +442,21 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'rgba(255,240,220,0.40)',
     fontSize: 13, fontStyle: 'italic',
     fontFamily: 'var(--font-sans)',
+  },
+
+  spinControl: {
+    position: 'absolute', right: 48, bottom: 80,
+    zIndex: 4, display: 'flex', flexDirection: 'column', gap: 6,
+    pointerEvents: 'auto',
+  },
+  spinLabel: {
+    fontFamily: 'var(--font-mono)', fontSize: 9,
+    letterSpacing: '0.35em', color: 'rgba(255,220,170,0.45)',
+  },
+  spinRange: {
+    width: 120,
+    accentColor: '#ffd100',
+    cursor: 'pointer',
   },
 
   minWidthGuard: {

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useRef, useEffect } from 'react';
 import type { Destination, SmartPickerState } from '../lib/types';
 
 interface SmartPickerProps {
@@ -87,6 +88,115 @@ const FIELDS: Array<{
   },
 ];
 
+interface CustomSelectProps {
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ value: string; label: string }>;
+  ariaLabel: string;
+}
+
+function CustomSelect({ value, onChange, options, ariaLabel }: CustomSelectProps) {
+  const [open, setOpen] = useState(false);
+  const [hoveredValue, setHoveredValue] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isSet = value !== '';
+  const selectedLabel = options.find(o => o.value === value)?.label;
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative' }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{
+          width: '100%',
+          padding: '8px 28px 8px 10px',
+          background: 'rgba(7,15,31,0.60)',
+          border: isSet ? '1px solid rgba(255,209,0,0.40)' : '1px solid rgba(255,220,170,0.15)',
+          color: isSet ? '#ffd100' : 'rgba(255,240,220,0.80)',
+          fontFamily: 'var(--font-mono)', fontSize: 9,
+          letterSpacing: '0.15em',
+          cursor: 'pointer', textAlign: 'left',
+          display: 'block',
+        }}
+        aria-label={ariaLabel}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+      >
+        {selectedLabel ?? '— Any'}
+      </button>
+      <div style={{
+        position: 'absolute', right: 8, top: '50%',
+        transform: 'translateY(-50%)',
+        fontFamily: 'var(--font-mono)', fontSize: 10,
+        color: 'rgba(255,220,170,0.40)',
+        pointerEvents: 'none',
+      }}>▾</div>
+
+      {open && (
+        <div
+          role="listbox"
+          aria-label={ariaLabel}
+          style={{
+            position: 'absolute', top: '100%', left: 0, right: 0,
+            background: '#070f1f',
+            border: '1px solid rgba(255,220,170,0.20)',
+            borderTop: 'none',
+            zIndex: 20,
+            maxHeight: 180, overflowY: 'auto',
+          }}
+        >
+          {/* "Any" option */}
+          <div
+            role="option"
+            aria-selected={value === ''}
+            style={{
+              padding: '8px 10px',
+              fontFamily: 'var(--font-mono)', fontSize: 9,
+              letterSpacing: '0.15em', cursor: 'pointer',
+              background: hoveredValue === '__any' ? '#ffd100' : 'transparent',
+              color: hoveredValue === '__any' ? '#050912' : 'rgba(255,240,220,0.50)',
+            }}
+            onMouseEnter={() => setHoveredValue('__any')}
+            onMouseLeave={() => setHoveredValue(null)}
+            onMouseDown={() => { onChange(''); setOpen(false); }}
+          >
+            — Any
+          </div>
+
+          {options.map(opt => (
+            <div
+              key={opt.value}
+              role="option"
+              aria-selected={value === opt.value}
+              style={{
+                padding: '8px 10px',
+                fontFamily: 'var(--font-mono)', fontSize: 9,
+                letterSpacing: '0.15em', cursor: 'pointer',
+                background: hoveredValue === opt.value ? '#ffd100' : 'transparent',
+                color: hoveredValue === opt.value ? '#050912' : 'rgba(255,240,220,0.80)',
+              }}
+              onMouseEnter={() => setHoveredValue(opt.value)}
+              onMouseLeave={() => setHoveredValue(null)}
+              onMouseDown={() => { onChange(opt.value); setOpen(false); }}
+            >
+              {opt.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const hasActivePicker = (picker: SmartPickerState) =>
   Object.values(picker).some(v => v !== '');
 
@@ -97,39 +207,22 @@ export default function SmartPicker({ picker, onChange, filtered }: SmartPickerP
     <div style={styles.panel}>
       <div style={styles.header}>FIND YOUR DISPATCH</div>
 
-      {FIELDS.map(field => {
-        const val = picker[field.key];
-        const isSet = val !== '';
-        return (
-          <div key={field.key} style={styles.fieldRow}>
-            <label style={styles.fieldLabel}>{field.label.toUpperCase()}</label>
-            <div style={styles.selectWrap}>
-              <select
-                value={val}
-                onChange={e => onChange(field.key, e.target.value)}
-                style={{
-                  ...styles.select,
-                  ...(isSet ? styles.selectActive : {}),
-                }}
-                aria-label={field.label}
-              >
-                <option value="">— Any</option>
-                {field.options.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-              <div style={styles.arrow}>▾</div>
-            </div>
-          </div>
-        );
-      })}
+      {FIELDS.map(field => (
+        <div key={field.key} style={styles.fieldRow}>
+          <label style={styles.fieldLabel}>{field.label.toUpperCase()}</label>
+          <CustomSelect
+            value={picker[field.key]}
+            onChange={value => onChange(field.key, value)}
+            options={field.options}
+            ariaLabel={field.label}
+          />
+        </div>
+      ))}
 
       {active && (
         <button
           style={styles.resetBtn}
-          onClick={() => {
-            FIELDS.forEach(f => onChange(f.key, ''));
-          }}
+          onClick={() => { FIELDS.forEach(f => onChange(f.key, '')); }}
         >
           CLEAR FILTERS
         </button>
@@ -164,29 +257,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'var(--font-mono)', fontSize: 8,
     letterSpacing: '0.25em', color: 'rgba(255,220,170,0.40)',
     marginBottom: 4,
-  },
-  selectWrap: { position: 'relative' },
-  select: {
-    width: '100%',
-    padding: '8px 28px 8px 10px',
-    background: 'rgba(7,15,31,0.60)',
-    border: '1px solid rgba(255,220,170,0.15)',
-    color: 'rgba(255,240,220,0.80)',
-    fontFamily: 'var(--font-mono)', fontSize: 9,
-    letterSpacing: '0.15em',
-    cursor: 'pointer',
-    outline: 'none',
-  },
-  selectActive: {
-    borderColor: 'rgba(255,209,0,0.40)',
-    color: '#ffd100',
-  },
-  arrow: {
-    position: 'absolute', right: 8, top: '50%',
-    transform: 'translateY(-50%)',
-    fontFamily: 'var(--font-mono)', fontSize: 10,
-    color: 'rgba(255,220,170,0.40)',
-    pointerEvents: 'none',
   },
   resetBtn: {
     marginTop: 10,

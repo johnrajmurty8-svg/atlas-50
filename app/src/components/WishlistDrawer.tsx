@@ -54,21 +54,20 @@ export default function WishlistDrawer({
 
   const handleRemove = (id: string, name: string) => {
     if (timerRef.current) clearTimeout(timerRef.current);
+    onRemove(id); // remove immediately so drawer close doesn't cancel it
     setPendingRemove({ id, name });
-    timerRef.current = setTimeout(() => {
-      onRemove(id);
-      setPendingRemove(null);
-    }, 3000);
+    timerRef.current = setTimeout(() => setPendingRemove(null), 3000);
   };
 
   const handleUndo = () => {
     if (timerRef.current) clearTimeout(timerRef.current);
+    onRemove(pendingRemove!.id); // toggleWish re-adds the item
     setPendingRemove(null);
   };
 
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
 
-  const visibleItems = saved.filter(d => d.id !== pendingRemove?.id);
+  const visibleItems = saved; // wishlist state already updated immediately
 
   return (
     <div ref={drawerRef} style={styles.drawer} role="dialog" aria-label="Your wishlist" aria-modal="true">

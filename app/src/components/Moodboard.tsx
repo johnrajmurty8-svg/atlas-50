@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Destination } from '../lib/types';
 
 interface MoodboardProps {
@@ -10,76 +10,54 @@ interface MoodboardProps {
   onClose: () => void;
 }
 
-function useImageFallback(src: string) {
-  const [failed, setFailed] = useState(false);
-  useEffect(() => { setFailed(false); }, [src]);
-  const onError = () => setFailed(true);
-  return { src: failed ? '' : src, onError, failed };
-}
-
-function BgImage({ src, style }: { src: string; style: React.CSSProperties }) {
-  const { src: safeSrc, onError } = useImageFallback(src);
-  // eslint-disable-next-line @next/next/no-img-element
+function RegionGlobe({ lat, lon }: { lat: number; lon: number }) {
+  const r = 70;
+  const cx = 90, cy = 90;
+  const dotX = cx, dotY = cy;
+  void lat; void lon; // used for display only in V3; dot is always centred
   return (
-    <img
-      src={safeSrc}
-      onError={onError}
-      alt=""
-      aria-hidden="true"
-      style={{
-        position: 'absolute', inset: 0,
-        width: '100%', height: '100%',
-        objectFit: 'cover',
-        ...style,
-      }}
-    />
+    <svg viewBox="0 0 180 180" style={{ width: '68%', maxWidth: 200, opacity: 0.95 }}>
+      <defs>
+        <radialGradient id="rgGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#ffd100" stopOpacity="0.45" />
+          <stop offset="60%" stopColor="#ffd100" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <circle cx={cx} cy={cy} r={r + 18} fill="url(#rgGlow)" />
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255,220,170,0.28)" strokeWidth="0.8" />
+      {([-60, -30, 0, 30, 60] as number[]).map(l => {
+        const ry = r * Math.cos(l * Math.PI / 180);
+        const oy = cy + r * Math.sin(l * Math.PI / 180) * 0.6;
+        return (
+          <ellipse key={l} cx={cx} cy={oy}
+            rx={r * Math.cos(l * Math.PI / 180)} ry={ry * 0.18}
+            fill="none" stroke="rgba(255,220,170,0.16)" strokeWidth="0.5" />
+        );
+      })}
+      {([0, 30, 60, 90, 120, 150] as number[]).map(l => (
+        <ellipse key={l} cx={cx} cy={cy}
+          rx={r * Math.abs(Math.sin(l * Math.PI / 180)) || 0.5} ry={r}
+          fill="none" stroke="rgba(255,220,170,0.16)" strokeWidth="0.5" />
+      ))}
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255,220,170,0.45)" strokeWidth="1" />
+      <circle cx={dotX} cy={dotY} r="9" fill="#ffd100" opacity="0.18">
+        <animate attributeName="r" from="6" to="14" dur="2s" repeatCount="indefinite" />
+        <animate attributeName="opacity" from="0.4" to="0" dur="2s" repeatCount="indefinite" />
+      </circle>
+      <circle cx={dotX} cy={dotY} r="3" fill="#ffd100" />
+      <circle cx={dotX} cy={dotY} r="3" fill="none" stroke="#fff7d0" strokeWidth="0.6" />
+    </svg>
   );
 }
 
 export default function Moodboard({ destination, isWished, onToggleWish, onClose }: MoodboardProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const closeBtnRef = useRef<HTMLButtonElement>(null);
-  const [scroll, setScroll] = useState(0);
-  const prevFocusRef = useRef<HTMLElement | null>(null);
-
-  // Focus trap + restore previous focus on close
-  useEffect(() => {
-    prevFocusRef.current = document.activeElement as HTMLElement;
-    closeBtnRef.current?.focus();
-
-    const root = rootRef.current;
-    if (!root) return;
-
-    const trap = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab') return;
-      const items = Array.from(root.querySelectorAll<HTMLElement>(
-        'button, [href], input, select, [tabindex]:not([tabindex="-1"])'
-      ));
-      const first = items[0];
-      const last = items[items.length - 1];
-      if (e.shiftKey) {
-        if (document.activeElement === first) { e.preventDefault(); last?.focus(); }
-      } else {
-        if (document.activeElement === last) { e.preventDefault(); first?.focus(); }
-      }
-    };
-
-    document.addEventListener('keydown', trap);
-    return () => {
-      document.removeEventListener('keydown', trap);
-      prevFocusRef.current?.focus();
-    };
-  }, []);
+  const [mounted, setMounted] = useState(false);
+  const [hoveredTile, setHoveredTile] = useState<number | null>(null);
 
   useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const onScroll = () => setScroll(el.scrollTop);
-    el.addEventListener('scroll', onScroll, { passive: true });
-    el.scrollTop = 0;
-    setScroll(0);
-    return () => el.removeEventListener('scroll', onScroll);
+    setMounted(false);
+    const t = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(t);
   }, [destination.id]);
 
   useEffect(() => {
@@ -88,395 +66,574 @@ export default function Moodboard({ destination, isWished, onToggleWish, onClose
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const images = destination.images;
-  const heroY = -scroll * 0.35;
-  const heroScale = 1 + Math.min(scroll, 400) * 0.0008;
-  const titleY = -scroll * 0.6;
-  const titleOpacity = Math.max(0, 1 - scroll / 400);
-  const frameY = -scroll * 0.15;
+  useEffect(() => {
+    if (!document.getElementById('moodboard-anim')) {
+      const s = document.createElement('style');
+      s.id = 'moodboard-anim';
+      s.textContent = '@keyframes mb-fade { from { opacity:0 } to { opacity:1 } }';
+      document.head.appendChild(s);
+    }
+  }, []);
+
+  const img = destination.images;
+  const issueNo = String((destination.id.length * 7 % 80) + 10).padStart(3, '0');
+  const weatherTemp = destination.weather.split('·')[0].trim();
+  const weatherSub = destination.weather.split('·').slice(1).join(' · ').trim() || 'Mediterranean climate';
+
+  const tile = (i: number, hovered = false): React.CSSProperties => ({
+    opacity: mounted ? 1 : 0,
+    transform: mounted
+      ? (hovered ? 'translateY(-5px) scale(1.014)' : 'translateY(0) scale(1)')
+      : 'translateY(18px)',
+    transition: mounted
+      ? `opacity .7s cubic-bezier(.2,.8,.2,1) ${80 + i * 70}ms, transform 0.13s cubic-bezier(.2,.8,.2,1), border-color 0.1s ease, box-shadow 0.1s ease`
+      : `opacity .7s cubic-bezier(.2,.8,.2,1) ${80 + i * 70}ms, transform .7s cubic-bezier(.2,.8,.2,1) ${80 + i * 70}ms, border-color 0.1s ease, box-shadow 0.1s ease`,
+    borderColor: hovered ? 'rgba(255,209,0,0.75)' : 'rgba(255,220,170,0.08)',
+    ...(hovered ? {
+      boxShadow: '0 14px 40px rgba(0,0,0,0.52), 0 0 0 1px rgba(255,209,0,0.08)',
+    } : {}),
+  });
 
   return (
-    <div ref={rootRef} style={styles.root} role="dialog" aria-modal="true" aria-label={`${destination.name} — destination dispatch`}>
-      <div style={{ ...styles.frame, transform: `translateY(${frameY * 0.2}px)` }} />
+    <div style={S.root}>
+      {/* Yellow magazine frame */}
+      <div style={S.frame} />
 
-      <button ref={closeBtnRef} style={styles.closeBtn} onClick={onClose} aria-label="Close moodboard">
-        <svg width="18" height="18" viewBox="0 0 18 18">
-          <path d="M3 3L15 15M15 3L3 15" stroke="currentColor" strokeWidth="1.5" />
-        </svg>
-      </button>
-
-      <button
-        style={{ ...styles.wishBtn, color: isWished ? '#ffd100' : 'rgba(255,255,255,0.85)' }}
-        onClick={() => onToggleWish(destination.id)}
-        aria-label={isWished ? 'Remove from wishlist' : 'Save to wishlist'}
-      >
-        <svg width="14" height="14" viewBox="0 0 14 14" fill={isWished ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.3">
-          <path d="M7 12.5 L2 7.5 A3 3 0 0 1 7 3 A3 3 0 0 1 12 7.5 Z" />
-        </svg>
-        <span style={{ marginLeft: 8, letterSpacing: '0.22em', fontSize: 10 }}>
-          {isWished ? 'SAVED' : 'SAVE'}
-        </span>
-      </button>
-
-      <div ref={scrollRef} style={styles.scroll}>
-        {/* HERO */}
-        <section style={styles.hero}>
-          <BgImage
-            src={images[0]}
+      {/* Top chrome — brand + issue + save + close */}
+      <div style={S.topbar}>
+        <div style={S.topLeft}>
+          <span style={S.brandDot} />
+          <span style={S.brandText}>ATLAS / 50</span>
+          <span style={S.topSep}>·</span>
+          <span style={S.topMeta}>VOL. XXVI</span>
+          <span style={S.topSep}>·</span>
+          <span style={S.topMeta}>No. {issueNo}</span>
+          <span style={S.topSep}>·</span>
+          <span style={S.topMeta}>{destination.region.toUpperCase()}</span>
+        </div>
+        <div style={S.topRight}>
+          <button
             style={{
-              transform: `translateY(${heroY}px) scale(${heroScale})`,
-              transformOrigin: 'center',
+              ...S.wishBtn,
+              color: isWished ? '#ffd100' : '#f4ecd4',
+              borderColor: isWished ? '#ffd100' : 'rgba(255,255,255,0.18)',
             }}
-          />
-          <div style={{
-            position: 'absolute', inset: 0,
-            background: 'linear-gradient(180deg, rgba(7,15,31,0.35) 0%, rgba(7,15,31,0) 40%, rgba(7,15,31,0.85) 100%)',
-          }} />
-          <div style={{
-            position: 'absolute', inset: 0,
-            transform: `translateY(${titleY}px)`, opacity: titleOpacity,
-            display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-            padding: '0 8vw 12vh',
-          }}>
-            <div style={styles.issueMark}>— ATLAS /50 · No. {destination.id.slice(0, 3).toUpperCase()} ——</div>
-            <div style={styles.region}>{destination.region}</div>
-            <h1 style={styles.title}>{destination.name}</h1>
-            <div style={styles.tagline}>{destination.tagline}</div>
-            <div style={styles.scrollHint}>
-              <span>Scroll</span>
-              <svg width="12" height="20" viewBox="0 0 12 20" fill="none">
-                <path d="M6 2 L6 17 M2 13 L6 17 L10 13" stroke="currentColor" strokeWidth="1.2" />
+            onClick={() => onToggleWish(destination.id)}
+          >
+            <svg width="11" height="11" viewBox="0 0 14 14"
+              fill={isWished ? '#ffd100' : 'none'}
+              stroke="currentColor" strokeWidth="1.4">
+              <path d="M7 12.5 L2 7.5 A3 3 0 0 1 7 3 A3 3 0 0 1 12 7.5 Z" />
+            </svg>
+            <span>{isWished ? 'SAVED' : 'SAVE'}</span>
+          </button>
+          <button style={S.closeBtn} onClick={onClose} aria-label="Close">
+            <svg width="14" height="14" viewBox="0 0 14 14">
+              <path d="M2 2 L12 12 M12 2 L2 12" stroke="currentColor" strokeWidth="1.3" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Bento grid — 12 cols × 6 rows */}
+      <div style={S.grid}>
+
+        {/* TILE 1 — Hero: image + giant first-letter typography */}
+        <div style={{ ...S.cell, ...S.tileHero, ...tile(0, hoveredTile === 0) }}
+          onMouseEnter={() => setHoveredTile(0)} onMouseLeave={() => setHoveredTile(null)}>
+          <div style={S.heroBg} aria-hidden="true">
+            <div style={{ ...S.heroImg, backgroundImage: `url(${img[0]})` }} />
+            <div style={S.heroVeil} />
+          </div>
+          <div style={S.heroInner}>
+            <div style={S.heroDisplay}>
+              <span style={S.heroDisplayChar}>{destination.name[0]}</span>
+              {destination.name[1] && (
+                <span style={S.heroDisplayCharSm}>{destination.name[1].toLowerCase()}</span>
+              )}
+            </div>
+            <div>
+              <div style={S.heroTitle}>{destination.name}</div>
+              <div style={S.heroSub}>{destination.tagline}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* TILE 2 — Themes */}
+        <div style={{ ...S.cell, ...S.tileThemes, ...tile(1, hoveredTile === 1) }}
+          onMouseEnter={() => setHoveredTile(1)} onMouseLeave={() => setHoveredTile(null)}>
+          <div style={S.themesGlyph}>
+            <span style={{ ...S.themesBar, width: '74%' }} />
+            <span style={{ ...S.themesBar, width: '58%' }} />
+            <span style={{ ...S.themesBar, width: '68%' }} />
+          </div>
+          <div style={S.tileTitle}>Themes</div>
+          <div style={S.tileBody}>
+            {destination.themes.map(t => t[0].toUpperCase() + t.slice(1)).join(' · ')}
+          </div>
+        </div>
+
+        {/* TILE 3 — Climate: SVG seasonal curve + weather data */}
+        <div style={{ ...S.cell, ...S.tileClimate, ...tile(2, hoveredTile === 2) }}
+          onMouseEnter={() => setHoveredTile(2)} onMouseLeave={() => setHoveredTile(null)}>
+          <div style={S.climateChart}>
+            <div style={S.climateLabel}>seasonal swing</div>
+            <svg viewBox="0 0 200 36" style={S.climateSvg} preserveAspectRatio="none">
+              <path d="M0 28 C 30 18, 60 8, 100 6 S 170 22, 200 28"
+                stroke="#ffd100" strokeWidth="1.2" fill="none" />
+              <path d="M0 28 C 30 18, 60 8, 100 6 S 170 22, 200 28 L200 36 L0 36 Z"
+                fill="rgba(255,209,0,0.08)" />
+            </svg>
+            <div style={S.climateAxis}>
+              <span>jan</span><span>apr</span><span>jul</span><span>oct</span>
+            </div>
+          </div>
+          <div style={S.tileTitle}>{weatherTemp}</div>
+          <div style={S.tileBody}>{weatherSub}</div>
+        </div>
+
+        {/* TILE 4 — Region globe: SVG sphere + lat/lon */}
+        <div style={{ ...S.cell, ...S.tileGlobe, ...tile(3, hoveredTile === 3) }}
+          onMouseEnter={() => setHoveredTile(3)} onMouseLeave={() => setHoveredTile(null)}>
+          <RegionGlobe lat={destination.lat} lon={destination.lon} />
+          <div style={S.globeFoot}>
+            <div style={{ ...S.tileTitle, display: 'flex', gap: 8, alignItems: 'center' }}>
+              <svg width="13" height="13" viewBox="0 0 14 14"
+                fill="none" stroke="currentColor" strokeWidth="1.3">
+                <circle cx="7" cy="7" r="6" />
+                <path d="M1 7 H13 M7 1 C 4 4, 4 10, 7 13 M7 1 C 10 4, 10 10, 7 13" />
               </svg>
+              <span>{destination.region}</span>
+            </div>
+            <div style={S.tileBody}>
+              {Math.abs(destination.lat).toFixed(1)}°{destination.lat >= 0 ? 'N' : 'S'}
+              {' · '}
+              {Math.abs(destination.lon).toFixed(1)}°{destination.lon >= 0 ? 'E' : 'W'}
             </div>
           </div>
-        </section>
+        </div>
 
-        {/* BENTO */}
-        <section style={styles.bento}>
-          <div style={styles.bentoGrid}>
-            <div style={{ ...styles.bentoCell, gridColumn: 'span 7', gridRow: 'span 2' }}>
-              <div style={styles.sectionLabel}>— THE OPENING</div>
-              <p style={styles.pull}>{destination.tagline}</p>
-              {destination.blurb && <p style={styles.body}>{destination.blurb}</p>}
-            </div>
-            <div style={{ ...styles.bentoCell, ...styles.accentCell, gridColumn: 'span 5' }}>
-              <div style={styles.sectionLabel}>— CLIMATE</div>
-              <div style={styles.bigStat}>{destination.weather.split('·')[0].trim()}</div>
-              <div style={styles.subtleStat}>{destination.weather.split('·').slice(1).join('·').trim()}</div>
-            </div>
-            <div style={{ ...styles.bentoCell, gridColumn: 'span 5' }}>
-              <div style={styles.sectionLabel}>— SIGNATURE DISH</div>
-              <div style={styles.dish}>{destination.dish}</div>
-            </div>
-            <div style={styles.themeRow}>
-              {destination.themes.map(t => (
-                <span key={t} style={styles.themeChip}>{t}</span>
-              ))}
-            </div>
+        {/* TILE 5 — Itinerary: 5 experiences in 2-col grid */}
+        <div style={{ ...S.cell, ...S.tileItinerary, ...tile(4, hoveredTile === 4) }}
+          onMouseEnter={() => setHoveredTile(4)} onMouseLeave={() => setHoveredTile(null)}>
+          <div style={S.itinHead}>
+            <svg width="13" height="13" viewBox="0 0 14 14"
+              fill="none" stroke="currentColor" strokeWidth="1.3">
+              <circle cx="7" cy="5" r="2.5" />
+              <path d="M7 8 L7 13 M3 13 L11 13" />
+            </svg>
+            <span style={S.tileTitle}>Itinerary</span>
+            <span style={S.itinCount}>05 stops</span>
           </div>
-        </section>
-
-        {/* DIPTYCH */}
-        <section style={styles.diptychSection}>
-          <div style={styles.sectionHeader}>
-            <div style={styles.sectionLabelLight}>— PART I</div>
-            <div style={styles.sectionTitle}>Landscape &amp; light</div>
-          </div>
-          <div style={styles.diptych}>
-            <div style={{ ...styles.diptychImg, position: 'relative', overflow: 'hidden', transform: `translateY(${Math.max(-40, (scroll - 600) * -0.05)}px)` }}>
-              <BgImage src={images[1]} style={{}} />
-            </div>
-            <div style={{ ...styles.diptychImg, position: 'relative', overflow: 'hidden', transform: `translateY(${Math.max(-40, (scroll - 600) * -0.08)}px)` }}>
-              <BgImage src={images[2]} style={{}} />
-            </div>
-          </div>
-        </section>
-
-        {/* EXPERIENCES */}
-        <section style={styles.experiences}>
-          <div style={styles.sectionHeader}>
-            <div style={styles.sectionLabelLight}>— PART II</div>
-            <div style={styles.sectionTitle}>Five to plan around</div>
-          </div>
-          <ol style={styles.expList}>
-            {destination.experiences.map((x, i) => (
-              <li key={i} style={styles.expItem}>
-                <span style={styles.expNum}>{String(i + 1).padStart(2, '0')}</span>
-                <span style={styles.expText}>{x}</span>
+          <ol style={S.itinList}>
+            {destination.experiences.slice(0, 5).map((x, i) => (
+              <li key={i} style={S.itinItem}>
+                <span style={S.itinNum}>{String(i + 1).padStart(2, '0')}</span>
+                <span style={S.itinText}>{x}</span>
               </li>
             ))}
           </ol>
-        </section>
+        </div>
 
-        {/* FULL-BLEED */}
-        <section style={{ ...styles.fullBleed, backgroundColor: '#050912' }}>
-          <BgImage src={images[3]} style={{ zIndex: 0 }} />
-          <div style={{
-            position: 'absolute', inset: 0, zIndex: 1,
-            background: 'linear-gradient(180deg, rgba(7,15,31,0.2), rgba(7,15,31,0.7))',
-          }} />
-          <div style={{ ...styles.fullBleedCopy, zIndex: 2 }}>
-            <div style={styles.sectionLabel}>— SOUNDTRACK</div>
-            <div style={styles.playlist}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#ffd100" strokeWidth="1.2" style={{ marginRight: 10 }}>
-                <path d="M5 10.5 V4 L11 3 V9" />
-                <circle cx="3.8" cy="10.5" r="1.2" fill="#ffd100" stroke="none" />
-                <circle cx="9.8" cy="9" r="1.2" fill="#ffd100" stroke="none" />
-              </svg>
-              <span>{destination.playlist}</span>
+        {/* TILE 6 — Finale: dish + soundtrack over image */}
+        <div style={{ ...S.cell, ...S.tileFinale, ...tile(5, hoveredTile === 5) }}
+          onMouseEnter={() => setHoveredTile(5)} onMouseLeave={() => setHoveredTile(null)}>
+          <div style={S.finaleBg} aria-hidden="true">
+            <div style={{ ...S.finaleImg, backgroundImage: `url(${img[2] || img[0]})` }} />
+            <div style={S.finaleVeil} />
+          </div>
+          <div style={S.finaleInner}>
+            <div style={S.finaleRow}>
+              <div style={S.finaleLabel}>— SIGNATURE DISH</div>
+              <div style={S.finaleDish}>{destination.dish}</div>
             </div>
-          </div>
-        </section>
-
-        {/* TRIPTYCH */}
-        <section style={styles.triptych}>
-          <div style={{ ...styles.triCell, position: 'relative', overflow: 'hidden' }}>
-            <BgImage src={images[3]} style={{}} />
-          </div>
-          <div style={{ ...styles.triCell, position: 'relative', overflow: 'hidden' }}>
-            <BgImage src={images[4] || images[0]} style={{}} />
-          </div>
-          <div style={{ ...styles.triCell, position: 'relative', overflow: 'hidden' }}>
-            <BgImage src={images[5] || images[1] || images[0]} style={{}} />
-          </div>
-        </section>
-
-        {/* FOOTER */}
-        <section style={styles.footer}>
-          <div style={styles.footerRule} />
-          <div style={styles.footerRow}>
-            <div>
-              <div style={styles.sectionLabelLight}>— DISPATCH</div>
-              <div style={styles.footerTitle}>Still dreaming?</div>
-              <div style={styles.footerBody}>
-                Save {destination.name} to your wishlist, or spin the globe and find another horizon.
+            <div style={S.finaleSep} />
+            <div style={S.finaleRow}>
+              <div style={S.finaleLabel}>— ON THE GRAMOPHONE</div>
+              <div style={S.finalePlay}>
+                <svg width="14" height="14" viewBox="0 0 14 14" style={{ flexShrink: 0 }}>
+                  <circle cx="7" cy="7" r="6" fill="none" stroke="#ffd100" strokeWidth="0.9" />
+                  <circle cx="7" cy="7" r="1.4" fill="#ffd100" />
+                </svg>
+                <span>{destination.playlist}</span>
               </div>
             </div>
-            <div style={styles.footerActions}>
-              <button style={styles.primaryBtn} onClick={() => onToggleWish(destination.id)}>
-                {isWished ? '— SAVED TO WISHLIST' : '+ SAVE TO WISHLIST'}
-              </button>
-              <button style={styles.ghostBtn} onClick={onClose}>
-                ← Back to the globe
-              </button>
-            </div>
           </div>
-          <div style={styles.colophon}>
-            Atlas /50 · an editorial compilation · images: unsplash · © MMXXVI
-          </div>
-        </section>
+        </div>
+
+      </div>
+
+      {/* Bottom colophon */}
+      <div style={S.colophon}>
+        <span>EST. 1899</span>
+        <span style={S.colSep}>· · ·</span>
+        <span>FILED FROM {destination.name.toUpperCase()}</span>
+        <span style={S.colSep}>· · ·</span>
+        <span>SPRING MMXXVI</span>
       </div>
     </div>
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const cellBase: React.CSSProperties = {
+  position: 'relative',
+  background: 'rgba(20, 26, 44, 0.55)',
+  border: '1px solid rgba(255,220,170,0.08)',
+  borderRadius: 14,
+  padding: '22px 24px',
+  overflow: 'hidden',
+  display: 'flex',
+  flexDirection: 'column',
+  willChange: 'opacity, transform',
+};
+
+const S: Record<string, React.CSSProperties> = {
   root: {
-    position: 'fixed', inset: 0, zIndex: 100,
-    background: '#070f1f', color: '#f4ecd4',
+    position: 'fixed',
+    inset: 0,
+    zIndex: 100,
+    background: 'radial-gradient(ellipse at 50% 30%, #0d1733 0%, #060b1a 65%, #03060f 100%)',
+    color: '#f4ecd4',
     fontFamily: 'var(--font-sans)',
+    animation: 'mb-fade 0.45s ease',
+    display: 'flex',
+    flexDirection: 'column',
+    paddingTop: 14,
+    paddingBottom: 14,
   },
   frame: {
-    position: 'absolute', inset: 14,
+    position: 'fixed',
+    top: 14, left: 14, right: 14, bottom: 14,
     border: '3px solid #ffd100',
-    pointerEvents: 'none', zIndex: 5,
-    boxShadow: '0 0 0 1px rgba(0,0,0,0.4)',
+    pointerEvents: 'none',
+    zIndex: 200,
+  },
+
+  // Top chrome
+  topbar: {
+    flexShrink: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '18px 38px 16px',
+    borderBottom: '1px solid rgba(255,220,170,0.08)',
+    margin: '0 14px',
+  },
+  topLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 14,
+    fontFamily: 'var(--font-mono)',
+    fontSize: 10,
+    letterSpacing: '0.3em',
+  },
+  brandDot: {
+    width: 7,
+    height: 7,
+    borderRadius: '50%',
+    background: '#ffd100',
+    display: 'inline-block',
+    flexShrink: 0,
+  },
+  brandText: { color: '#ffd100', fontWeight: 700 },
+  topSep: { color: 'rgba(244,236,212,0.3)' },
+  topMeta: { color: 'rgba(244,236,212,0.7)' },
+  topRight: { display: 'flex', gap: 8, alignItems: 'center' },
+  wishBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 7,
+    padding: '8px 14px',
+    background: 'rgba(7,15,31,0.6)',
+    border: '1px solid rgba(255,255,255,0.18)',
+    cursor: 'pointer',
+    fontFamily: 'var(--font-mono)',
+    fontSize: 9,
+    letterSpacing: '0.25em',
+    transition: 'all 0.2s',
   },
   closeBtn: {
-    position: 'absolute', top: 36, right: 36,
-    width: 44, height: 44,
+    width: 32,
+    height: 32,
     background: 'rgba(7,15,31,0.6)',
-    border: '1px solid rgba(255,255,255,0.2)',
-    color: '#fff', cursor: 'pointer', zIndex: 10,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    backdropFilter: 'blur(10px)',
+    border: '1px solid rgba(255,255,255,0.18)',
+    cursor: 'pointer',
+    color: '#f4ecd4',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  wishBtn: {
-    position: 'absolute', top: 36, right: 92,
-    padding: '0 18px', height: 44,
-    background: 'rgba(7,15,31,0.6)',
-    border: '1px solid rgba(255,255,255,0.2)',
-    cursor: 'pointer', zIndex: 10,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    backdropFilter: 'blur(10px)',
+
+  // Bento grid
+  grid: {
+    flex: 1,
+    minHeight: 0,
+    display: 'grid',
+    gridTemplateColumns: 'repeat(12, 1fr)',
+    gridTemplateRows: 'repeat(6, 1fr)',
+    gap: 14,
+    padding: '18px 38px 14px',
+    margin: '0 14px',
+  },
+
+  cell: cellBase,
+
+  // Tile 1 — Hero
+  tileHero: {
+    gridColumn: '1 / span 4',
+    gridRow: '1 / span 4',
+    padding: 0,
+  },
+  heroBg: { position: 'absolute', inset: 0, zIndex: 0 },
+  heroImg: {
+    position: 'absolute',
+    inset: 0,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    filter: 'saturate(0.85) contrast(1.05)',
+  },
+  heroVeil: {
+    position: 'absolute',
+    inset: 0,
+    background: 'linear-gradient(180deg, rgba(7,15,31,0.55) 0%, rgba(7,15,31,0.78) 100%)',
+  },
+  heroInner: {
+    position: 'relative',
+    zIndex: 1,
+    height: '100%',
+    padding: '30px 32px',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+  },
+  heroDisplay: {
+    fontFamily: 'var(--font-serif)',
+    color: '#fff',
+    lineHeight: 0.85,
+    letterSpacing: -4,
+    display: 'flex',
+    alignItems: 'baseline',
+  },
+  heroDisplayChar: { fontSize: 'clamp(140px, 13vw, 220px)' },
+  heroDisplayCharSm: {
+    fontSize: 'clamp(80px, 7vw, 120px)',
+    opacity: 0.85,
+    fontStyle: 'italic',
+  },
+  heroTitle: {
+    fontFamily: 'var(--font-serif)',
+    fontSize: 'clamp(28px, 2.2vw, 38px)',
+    color: '#fff',
+    lineHeight: 1.05,
+    marginBottom: 8,
+  },
+  heroSub: {
+    fontFamily: 'var(--font-serif)',
+    fontStyle: 'italic',
+    fontSize: 'clamp(13px, 1vw, 16px)',
+    color: 'rgba(244,236,212,0.78)',
+    lineHeight: 1.45,
+    maxWidth: 380,
+  },
+
+  // Tile 2 — Themes
+  tileThemes: {
+    gridColumn: '5 / span 4',
+    gridRow: '1 / span 2',
+  },
+  themesGlyph: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+    marginBottom: 'auto',
+  },
+  themesBar: {
+    height: 8,
+    background: 'rgba(244,236,212,0.32)',
+    borderRadius: 4,
+    display: 'block',
+  },
+
+  // Tile 3 — Climate
+  tileClimate: {
+    gridColumn: '5 / span 4',
+    gridRow: '3 / span 2',
+  },
+  climateChart: { marginBottom: 'auto', position: 'relative' },
+  climateLabel: {
     fontFamily: 'var(--font-mono)',
+    fontSize: 8.5,
+    letterSpacing: '0.25em',
+    color: 'rgba(244,236,212,0.5)',
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    marginBottom: 4,
   },
-  scroll: {
-    position: 'absolute', inset: 0,
-    overflowY: 'auto', overflowX: 'hidden',
-    scrollBehavior: 'smooth',
+  climateSvg: { width: '100%', height: 36, display: 'block' },
+  climateAxis: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    fontFamily: 'var(--font-mono)',
+    fontSize: 8,
+    color: 'rgba(244,236,212,0.4)',
+    letterSpacing: '0.2em',
+    marginTop: 2,
   },
-  hero: { position: 'relative', height: '100vh', width: '100%', overflow: 'hidden' },
-  issueMark: {
-    fontFamily: 'var(--font-mono)', fontSize: 11,
-    letterSpacing: '0.3em', color: '#ffd100', marginBottom: 28,
+
+  // Tile 4 — Globe
+  tileGlobe: {
+    gridColumn: '9 / span 4',
+    gridRow: '1 / span 4',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '30px 28px',
   },
-  region: {
-    fontFamily: 'var(--font-mono)', fontSize: 11,
-    letterSpacing: '0.4em', color: 'rgba(255,255,255,0.6)',
-    marginBottom: 16, textTransform: 'uppercase',
+  globeFoot: {
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
   },
-  title: {
+
+  // Shared tile typography
+  tileTitle: {
     fontFamily: 'var(--font-serif)',
-    fontSize: 'clamp(72px, 11vw, 200px)',
-    fontWeight: 400, lineHeight: 0.95,
-    margin: 0, color: '#fff', letterSpacing: -2,
-    textShadow: '0 4px 40px rgba(0,0,0,0.4)',
+    fontSize: 'clamp(20px, 1.6vw, 26px)',
+    color: '#fff',
+    lineHeight: 1.1,
+    marginTop: 6,
   },
-  tagline: {
-    fontFamily: 'var(--font-serif)', fontStyle: 'italic',
-    fontSize: 'clamp(18px, 2.2vw, 28px)',
-    lineHeight: 1.35, marginTop: 28,
-    maxWidth: 720, color: 'rgba(255,240,220,0.92)',
+  tileBody: {
+    fontFamily: 'var(--font-sans)',
+    fontSize: 13,
+    lineHeight: 1.5,
+    color: 'rgba(123, 162, 217, 0.85)',
   },
-  scrollHint: {
-    position: 'absolute', bottom: 40, left: '50%',
-    transform: 'translateX(-50%)',
-    display: 'flex', flexDirection: 'column',
-    alignItems: 'center', gap: 6,
-    fontFamily: 'var(--font-mono)', fontSize: 10,
-    letterSpacing: '0.35em', color: 'rgba(255,255,255,0.5)',
+
+  // Tile 5 — Itinerary
+  tileItinerary: {
+    gridColumn: '1 / span 7',
+    gridRow: '5 / span 2',
+    padding: '20px 26px',
   },
-  bento: { padding: '14vh 8vw 8vh', maxWidth: 1400, margin: '0 auto' },
-  bentoGrid: { display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 24 },
-  bentoCell: {
-    padding: '36px 32px',
-    background: 'rgba(255,240,220,0.04)',
-    border: '1px solid rgba(255,220,170,0.15)',
-    minHeight: 200,
+  itinHead: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    color: '#fff',
+    marginBottom: 10,
   },
-  accentCell: {
-    background: 'linear-gradient(135deg, #ffd10011, #ffd10003)',
-    border: '1px solid rgba(255,209,0,0.3)',
-  },
-  sectionLabel: {
-    fontFamily: 'var(--font-mono)', fontSize: 10,
-    letterSpacing: '0.35em', color: '#ffd100',
-    marginBottom: 20, textTransform: 'uppercase',
-  },
-  sectionLabelLight: {
-    fontFamily: 'var(--font-mono)', fontSize: 10,
-    letterSpacing: '0.35em', color: 'rgba(255,255,255,0.5)',
-    marginBottom: 12,
-  },
-  sectionHeader: { padding: '8vh 8vw 4vh', maxWidth: 1400, margin: '0 auto' },
-  sectionTitle: {
-    fontFamily: 'var(--font-serif)',
-    fontSize: 'clamp(36px, 5vw, 68px)',
-    lineHeight: 1.05, color: '#fff', letterSpacing: -0.8,
-  },
-  pull: {
-    fontFamily: 'var(--font-serif)', fontStyle: 'italic',
-    fontSize: 'clamp(22px, 2.4vw, 32px)',
-    lineHeight: 1.35, color: '#fff', margin: '0 0 20px',
-  },
-  body: {
-    fontSize: 15, lineHeight: 1.65,
-    color: 'rgba(255,240,220,0.72)',
-    margin: 0, maxWidth: 560,
-  },
-  bigStat: {
-    fontFamily: 'var(--font-serif)',
-    fontSize: 'clamp(36px, 4vw, 56px)',
-    color: '#ffd100', lineHeight: 1,
-  },
-  subtleStat: { fontSize: 14, color: 'rgba(255,240,220,0.7)', marginTop: 10 },
-  dish: {
-    fontFamily: 'var(--font-serif)',
-    fontSize: 'clamp(22px, 2.4vw, 32px)',
-    lineHeight: 1.2, color: '#fff',
-  },
-  themeRow: {
-    gridColumn: 'span 12',
-    display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 4,
-  },
-  themeChip: {
-    padding: '7px 14px',
-    border: '1px solid rgba(255,209,0,0.4)',
+  itinCount: {
+    marginLeft: 'auto',
+    fontFamily: 'var(--font-mono)',
+    fontSize: 9,
+    letterSpacing: '0.25em',
     color: '#ffd100',
+  },
+  itinList: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    columnGap: 24,
+    rowGap: 6,
+    listStyle: 'none',
+    padding: 0,
+    margin: 0,
+    flex: 1,
+    alignContent: 'center',
+  },
+  itinItem: {
+    display: 'flex',
+    alignItems: 'baseline',
+    gap: 10,
+    paddingBottom: 6,
+    borderBottom: '1px solid rgba(255,220,170,0.08)',
+  },
+  itinNum: {
     fontFamily: 'var(--font-mono)',
-    fontSize: 10, letterSpacing: '0.25em',
+    fontSize: 9,
+    letterSpacing: '0.2em',
+    color: '#ffd100',
+    flexShrink: 0,
+    minWidth: 20,
+  },
+  itinText: {
+    fontFamily: 'var(--font-serif)',
+    fontSize: 'clamp(13px, 1.05vw, 16px)',
+    color: '#f4ecd4',
+    lineHeight: 1.3,
+  },
+
+  // Tile 6 — Finale
+  tileFinale: {
+    gridColumn: '8 / span 5',
+    gridRow: '5 / span 2',
+    padding: 0,
+  },
+  finaleBg: { position: 'absolute', inset: 0, zIndex: 0 },
+  finaleImg: {
+    position: 'absolute',
+    inset: 0,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    filter: 'saturate(0.8) contrast(1.05)',
+  },
+  finaleVeil: {
+    position: 'absolute',
+    inset: 0,
+    background: 'linear-gradient(115deg, rgba(7,15,31,0.92) 0%, rgba(7,15,31,0.7) 60%, rgba(7,15,31,0.5) 100%)',
+  },
+  finaleInner: {
+    position: 'relative',
+    zIndex: 1,
+    height: '100%',
+    padding: '22px 26px',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    gap: 14,
+  },
+  finaleRow: { display: 'flex', flexDirection: 'column', gap: 5 },
+  finaleLabel: {
+    fontFamily: 'var(--font-mono)',
+    fontSize: 9,
+    letterSpacing: '0.3em',
+    color: '#ffd100',
     textTransform: 'uppercase',
   },
-  diptychSection: { padding: '0 0 6vh' },
-  diptych: {
-    display: 'grid', gridTemplateColumns: '1fr 1fr',
-    gap: 6, padding: '0 4vw',
-    maxWidth: 1400, margin: '0 auto',
-  },
-  diptychImg: {
-    height: '70vh',
-    backgroundSize: 'cover', backgroundPosition: 'center',
-    willChange: 'transform',
-  },
-  experiences: { padding: '4vh 8vw 10vh', maxWidth: 1200, margin: '0 auto' },
-  expList: { listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 4 },
-  expItem: {
-    display: 'flex', alignItems: 'baseline',
-    gap: 28, padding: '28px 0',
-    borderTop: '1px solid rgba(255,220,170,0.12)',
-  },
-  expNum: {
-    fontFamily: 'var(--font-mono)', fontSize: 13,
-    color: '#ffd100', letterSpacing: '0.2em', minWidth: 44,
-  },
-  expText: {
+  finaleDish: {
     fontFamily: 'var(--font-serif)',
-    fontSize: 'clamp(22px, 2.2vw, 32px)',
-    lineHeight: 1.25, color: '#fff',
+    fontStyle: 'italic',
+    fontSize: 'clamp(20px, 1.7vw, 28px)',
+    color: '#fff',
+    lineHeight: 1.2,
   },
-  fullBleed: {
-    position: 'relative', height: '80vh', width: '100%',
-    backgroundSize: 'cover', backgroundPosition: 'center',
-    backgroundAttachment: 'fixed',
-    display: 'flex', alignItems: 'flex-end',
-  },
-  fullBleedCopy: { padding: '0 8vw 10vh', position: 'relative', zIndex: 2 },
-  playlist: {
-    display: 'flex', alignItems: 'center',
+  finalePlay: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 9,
     fontFamily: 'var(--font-serif)',
-    fontSize: 'clamp(22px, 2.4vw, 34px)',
-    fontStyle: 'italic', color: '#fff',
+    fontSize: 'clamp(15px, 1.15vw, 19px)',
+    color: '#f4ecd4',
   },
-  triptych: {
-    display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr',
-    gap: 6, padding: '6vh 4vw',
-    maxWidth: 1600, margin: '0 auto',
+  finaleSep: {
+    width: 40,
+    height: 1,
+    background: 'rgba(255,220,170,0.25)',
   },
-  triCell: { height: '52vh', backgroundSize: 'cover', backgroundPosition: 'center' },
-  footer: { padding: '8vh 8vw 10vh', maxWidth: 1200, margin: '0 auto' },
-  footerRule: { height: 1, background: 'rgba(255,220,170,0.2)', marginBottom: 50 },
-  footerRow: {
-    display: 'flex', justifyContent: 'space-between',
-    alignItems: 'flex-end', gap: 60, flexWrap: 'wrap',
-  },
-  footerTitle: {
-    fontFamily: 'var(--font-serif)',
-    fontSize: 'clamp(34px, 4vw, 56px)',
-    color: '#fff', margin: '6px 0 12px', letterSpacing: -0.5,
-  },
-  footerBody: {
-    fontSize: 15, lineHeight: 1.6,
-    color: 'rgba(255,240,220,0.65)', maxWidth: 460,
-  },
-  footerActions: { display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'flex-start' },
-  primaryBtn: {
-    padding: '16px 28px',
-    background: '#ffd100', color: '#070f1f',
-    border: 'none',
-    fontFamily: 'var(--font-mono)',
-    fontSize: 11, letterSpacing: '0.3em', cursor: 'pointer',
-  },
-  ghostBtn: {
-    padding: '16px 28px',
-    background: 'transparent', color: '#fff',
-    border: '1px solid rgba(255,255,255,0.25)',
-    fontFamily: 'var(--font-sans)',
-    fontSize: 14, cursor: 'pointer',
-  },
+
+  // Colophon
   colophon: {
-    fontFamily: 'var(--font-mono)', fontSize: 10,
-    letterSpacing: '0.3em', color: 'rgba(255,240,220,0.35)',
-    marginTop: 50, textAlign: 'center', textTransform: 'uppercase',
+    flexShrink: 0,
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+    padding: '12px 38px 0',
+    margin: '0 14px',
+    fontFamily: 'var(--font-mono)',
+    fontSize: 9,
+    letterSpacing: '0.3em',
+    color: 'rgba(244,236,212,0.4)',
   },
+  colSep: { color: 'rgba(244,236,212,0.2)' },
 };

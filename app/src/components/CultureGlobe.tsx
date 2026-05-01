@@ -22,12 +22,16 @@ interface CultureGlobeProps {
   visibleIds: string[];
   onHover: (dest: Destination | null) => void;
   onClick: (dest: Destination) => void;
+  spinSpeed?: number;
 }
 
 const CultureGlobe = forwardRef<GlobeRef, CultureGlobeProps>(
-  function CultureGlobe({ destinations, visibleIds, onHover, onClick }, ref) {
+  function CultureGlobe({ destinations, visibleIds, onHover, onClick, spinSpeed = 0.0336 }, ref) {
     const mountRef = useRef<HTMLDivElement>(null);
     const [webglFailed, setWebglFailed] = useState(false);
+    const spinSpeedRef = useRef(spinSpeed);
+    useEffect(() => { spinSpeedRef.current = spinSpeed; }, [spinSpeed]);
+
     const stateRef = useRef<{
       group?: THREE.Group;
       camera?: THREE.PerspectiveCamera;
@@ -66,7 +70,7 @@ const CultureGlobe = forwardRef<GlobeRef, CultureGlobeProps>(
 
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(42, W / H, 0.1, 100);
-      camera.position.z = 4.0;
+      camera.position.z = 5.0;
 
       let renderer: THREE.WebGLRenderer;
       try {
@@ -165,7 +169,7 @@ const CultureGlobe = forwardRef<GlobeRef, CultureGlobeProps>(
       );
       group.add(atmo);
 
-      const dustCount = 600;
+      const dustCount = 1500;
       const dustPos = new Float32Array(dustCount * 3);
       for (let i = 0; i < dustCount; i++) {
         const r = 10 + Math.random() * 8;
@@ -178,7 +182,7 @@ const CultureGlobe = forwardRef<GlobeRef, CultureGlobeProps>(
       const dustGeom = new THREE.BufferGeometry();
       dustGeom.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
       const dust = new THREE.Points(dustGeom, new THREE.PointsMaterial({
-        color: 0xf5d48a, size: 0.025, transparent: true, opacity: 0.5, sizeAttenuation: true,
+        color: 0xfffaf0, size: 0.06, transparent: true, opacity: 1.0, sizeAttenuation: true,
       }));
       scene.add(dust);
 
@@ -314,7 +318,7 @@ const CultureGlobe = forwardRef<GlobeRef, CultureGlobeProps>(
             s.targetRot = null;
           }
         } else if (!dragging && !s.userPaused && s.group) {
-          s.group.rotation.y += 0.028 * dt;
+          s.group.rotation.y += spinSpeedRef.current * dt;
         }
 
         hotspotGroup.children.forEach(m => {
@@ -342,7 +346,7 @@ const CultureGlobe = forwardRef<GlobeRef, CultureGlobeProps>(
           }
         });
 
-        dust.rotation.y -= 0.012 * dt;
+        dust.rotation.y -= 0.022 * dt;
         renderer.render(scene, camera);
         raf = requestAnimationFrame(tick);
       }
