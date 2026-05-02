@@ -8,17 +8,30 @@ import type { Topology } from 'topojson-specification';
 import { latLonToVec3 } from '../lib/globeUtils';
 import type { Destination, GlobeRef } from '../lib/types';
 
+const INTRO_DURATION_MS = 1400;
+const INTRO_START_Z = 1.8;
+const INTRO_END_Z   = 5.75;
+
+function computeGlobeRotation(lat: number, lon: number): { x: number; y: number } {
+  const phi   = (90 - lat)  * Math.PI / 180;
+  const theta = (lon + 180) * Math.PI / 180;
+  return { x: Math.PI / 2 - phi, y: theta - Math.PI / 2 };
+}
+
 interface CultureGlobeProps {
   destinations: Destination[];
   visibleIds: string[];
   onHover: (dest: Destination | null) => void;
   onClick: (dest: Destination) => void;
   spinSpeed?: number;
+  startingLocation?: { lat: number; lon: number } | null;
+  onIntroComplete?: () => void;
 }
 
 const CultureGlobe = forwardRef<GlobeRef, CultureGlobeProps>(
-  function CultureGlobe({ destinations, visibleIds, onHover, onClick, spinSpeed = 0.0336 }, ref) {
+  function CultureGlobe({ destinations, visibleIds, onHover, onClick, spinSpeed = 0.0336, startingLocation, onIntroComplete }, ref) {
     const mountRef = useRef<HTMLDivElement>(null);
+    const introPlayedRef = useRef(false);
     const [webglFailed, setWebglFailed] = useState(false);
     const spinSpeedRef = useRef(spinSpeed);
     useEffect(() => { spinSpeedRef.current = spinSpeed; }, [spinSpeed]);
@@ -46,10 +59,7 @@ const CultureGlobe = forwardRef<GlobeRef, CultureGlobeProps>(
       flyTo(destination: Destination) {
         const s = stateRef.current;
         if (!s.group) return;
-        const phi = (90 - destination.lat) * Math.PI / 180;
-        const theta = (destination.lon + 180) * Math.PI / 180;
-        const rawTargetY = theta - Math.PI / 2;
-        const rawTargetX = Math.PI / 2 - phi;
+        const { x: rawTargetX, y: rawTargetY } = computeGlobeRotation(destination.lat, destination.lon);
         // Normalise accumulated rotation to [-PI, PI] then take shortest angular delta
         // to prevent multi-rotation backward spin after heavy user dragging.
         const currentY = ((s.group.rotation.y % (Math.PI * 2)) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
@@ -79,7 +89,7 @@ const CultureGlobe = forwardRef<GlobeRef, CultureGlobeProps>(
 
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(42, W / H, 0.1, 100);
-      camera.position.z = 5.75;
+      camera.position.z = INTRO_END_Z;
 
       let renderer: THREE.WebGLRenderer;
       try {
@@ -370,6 +380,25 @@ const CultureGlobe = forwardRef<GlobeRef, CultureGlobeProps>(
 
       stateRef.current = { group, camera, userPaused: false, targetRot: null };
 
+      let introActive = false;
+      let introStartT = 0;
+
+      if (
+        startingLocation &&
+        !introPlayedRef.current &&
+        !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      ) {
+        const { x: targetX, y: targetY } = computeGlobeRotation(startingLocation.lat, startingLocation.lon);
+        group.rotation.x = targetX;
+        group.rotation.y = targetY;
+        camera.position.z = INTRO_START_Z;
+        stateRef.current.userPaused = true;
+        introActive = true;
+        introStartT = performance.now();
+      }
+
+      if (!introActive) onIntroComplete?.();
+
       let t0 = performance.now();
       let raf: number;
 
@@ -378,6 +407,20 @@ const CultureGlobe = forwardRef<GlobeRef, CultureGlobeProps>(
         const dt = (t - t0) / 1000;
         t0 = t;
         const s = stateRef.current;
+
+        if (introActive && s.camera) {
+          const elapsed = performance.now() - introStartT;
+          const progress = Math.min(elapsed / INTRO_DURATION_MS, 1);
+          const eased = 1 - Math.pow(1 - progress, 5);
+          s.camera.position.z = INTRO_START_Z + (INTRO_END_Z - INTRO_START_Z) * eased;
+          if (progress >= 1) {
+            s.camera.position.z = INTRO_END_Z;
+            introActive = false;
+            s.userPaused = false;
+            introPlayedRef.current = true;
+            onIntroComplete?.();
+          }
+        }
 
         if (s.targetRot && s.group) {
           const ease = 1 - Math.pow(0.001, dt);

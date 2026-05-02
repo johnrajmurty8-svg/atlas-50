@@ -2,6 +2,50 @@
 
 ---
 
+## V8 — 2 May 2026
+
+**Change:** Cinematic Opening Animation (Location-Aware Globe Reveal)
+**Brief:** `change-brief-v8.md`
+
+### What Changed
+
+- Added `lib/locationUtils.ts` with `resolveStartingLocation()` — synchronous, permission-free, timezone-based location resolution with regional fallbacks and Malaysia as the universal default
+- `CultureGlobe` now mounts deeply zoomed (`camera.position.z = 1.8`) and oriented toward the resolved starting location's lat/lon, then animates camera back to the default view (`z = 5.0`) over 600ms with cubic ease-out
+- Auto-rotation suppressed during the intro (`userPaused = true`); resumes automatically at the slider's current speed when the intro completes
+- `prefers-reduced-motion: reduce` skips the intro entirely — globe mounts at default state
+- Intro guarded by `introPlayedRef` — fires once per session, never replays on component re-mount
+- Lat/lon → rotation formula extracted into a private helper inside `CultureGlobe.tsx` so the intro and `flyTo()` share a single source of truth (no behavioural change to `flyTo`)
+- `App.tsx` resolves starting location synchronously on mount and passes it to `CultureGlobe` via the new `startingLocation` prop
+
+### What Didn't Change
+
+- `latLonToVec3` formula — locked
+- `flyTo()` math, signature, behaviour — locked (refactor only; the formula moves to a shared helper but the math is identical)
+- `resume()` API
+- Globe geometry, sphere radius, camera FOV (42°)
+- Wheel zoom range (2.4–6.5) — only the intro's programmatic z-write goes outside this range, which is correct
+- Auto-rotate speed, spin speed slider, `spinSpeedRef` mechanism
+- Texture pipeline (continent fill, hatching, biome bands, coastline, graticule)
+- Hotspot dots, halo pulse, raycasting
+- Atmospheric halo shader, star/dust particles
+- `Moodboard`, `SmartPicker`, `WishlistDrawer`, `BottomBar`, `ThemeChips`
+- Yellow viewport frame
+- All design tokens, fonts
+- `destinations.json` — neither schema nor values
+- Wishlist localStorage, hover card, search, filters, Surprise Me
+
+### Affected Documents
+
+| Document | Changed |
+|---|---|
+| PRD | Yes — FR-013 added (opening animation) |
+| App Flow | Yes — §2 opening sequence updated |
+| UI Guide | Yes — §4.1 intro animation timing locked |
+| Backend Spec | No |
+| Security Checklist | No |
+
+---
+
 ## V7 — 2 May 2026
 
 **Change:** Globe Coordinate & FlyTo Math Corrections

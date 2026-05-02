@@ -3,6 +3,7 @@
 import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import type { Destination, SmartPickerState, GlobeRef } from '../lib/types';
 import { filterDestinations } from '../lib/filterUtils';
+import { resolveStartingLocation } from '../lib/locationUtils';
 import ThemeChips from './ThemeChips';
 import HoverCard from './HoverCard';
 import BottomBar from './BottomBar';
@@ -49,13 +50,18 @@ export default function App({ destinations }: AppProps) {
   const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
   const [spinSpeed, setSpinSpeed] = useState(0.18);
   const [clientReady, setClientReady] = useState(false);
+  const [startingLocation, setStartingLocation] = useState<{ lat: number; lon: number } | null>(null);
+  const [introComplete, setIntroComplete] = useState(false);
   const [hoveredListId, setHoveredListId] = useState<string | null>(null);
 
   const [picker, setPicker] = useState<SmartPickerState>({
     vibe: '', cost: '', season: '', environment: '', theme: '', groupSize: '',
   });
 
-  useEffect(() => setClientReady(true), []);
+  useEffect(() => {
+    setClientReady(true);
+    setStartingLocation(resolveStartingLocation());
+  }, []);
 
   // Load wishlist from localStorage after hydration to avoid server/client mismatch
   useEffect(() => {
@@ -118,6 +124,8 @@ export default function App({ destinations }: AppProps) {
     setPicker(prev => ({ ...prev, [key]: value }));
   }, []);
 
+  const handleIntroComplete = useCallback(() => setIntroComplete(true), []);
+
   const handleMoodboardClose = useCallback(() => {
     setSelected(null);
     globeRef.current?.resume();
@@ -157,12 +165,21 @@ export default function App({ destinations }: AppProps) {
             onHover={setHovered}
             onClick={handleGlobeClick}
             spinSpeed={spinSpeed}
+            startingLocation={startingLocation}
+            onIntroComplete={handleIntroComplete}
           />
         ) : (
           <GlobeLoading />
         )}
         <div style={styles.vignette} />
       </div>
+
+      {/* UI panels — hidden during intro, fade in when complete */}
+      <div style={{
+        opacity: introComplete ? 1 : 0,
+        transition: 'opacity 0.8s ease',
+        pointerEvents: introComplete ? 'auto' : 'none',
+      }}>
 
       {/* Masthead */}
       <header style={styles.masthead}>
@@ -320,6 +337,11 @@ export default function App({ destinations }: AppProps) {
           aria-label="Globe spin speed"
         />
       </div>
+
+      {/* Yellow viewport frame */}
+      <div style={{ position: 'fixed', inset: 14, border: '3px solid #ffd100', zIndex: 200, pointerEvents: 'none' }} />
+
+      </div>{/* end intro-gated UI */}
     </div>
   );
 }

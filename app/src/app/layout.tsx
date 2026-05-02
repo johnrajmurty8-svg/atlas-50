@@ -39,7 +39,6 @@ export default function RootLayout({
     <html lang="en" style={{ background: '#050912' }}>
       <body className={`${dmSerifDisplay.variable} ${inter.variable} ${jetbrainsMono.variable}`}>
         {children}
-        <div style={{ position: 'fixed', inset: 14, border: '3px solid #ffd100', zIndex: 200, pointerEvents: 'none' }} />
       </body>
       {/* Plausible analytics — update data-domain before production launch */}
       <Script
