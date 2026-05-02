@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+
 interface BottomBarProps {
   total: number;
   wishlistCount: number;
@@ -11,6 +13,9 @@ interface BottomBarProps {
 export default function BottomBar({
   total, wishlistCount, onSurprise, onWishlistToggle, wishlistOpen,
 }: BottomBarProps) {
+  const [hovSurprise, setHovSurprise] = useState(false);
+  const [hovWishlist, setHovWishlist] = useState(false);
+
   return (
     <div style={styles.bar}>
       <div style={styles.item}>
@@ -22,7 +27,16 @@ export default function BottomBar({
         <div style={styles.label}>— ON YOUR LIST</div>
         <div style={styles.value}>{String(wishlistCount).padStart(2, '0')}</div>
       </div>
-      <button style={styles.surpriseBtn} onClick={onSurprise} aria-label="Surprise me">
+      <button
+        style={{
+          ...styles.surpriseBtn,
+          ...(hovSurprise ? { background: '#e8c000', transform: 'translateY(-1px)' } : {}),
+        }}
+        onMouseEnter={() => setHovSurprise(true)}
+        onMouseLeave={() => setHovSurprise(false)}
+        onClick={onSurprise}
+        aria-label="Surprise me"
+      >
         <svg width="12" height="12" viewBox="0 0 12 12" style={{ marginRight: 10 }}>
           <path d="M1 6 Q3 1 6 6 T11 6" stroke="currentColor" strokeWidth="1.2" fill="none" />
           <circle cx="11" cy="6" r="1" fill="currentColor" />
@@ -30,7 +44,16 @@ export default function BottomBar({
         SURPRISE ME
       </button>
       <button
-        style={styles.wishlistBtn}
+        style={{
+          ...styles.wishlistBtn,
+          ...(hovWishlist || wishlistOpen ? {
+            borderColor: 'rgba(255,220,170,0.55)',
+            color: '#ffd100',
+            transform: 'translateY(-1px)',
+          } : {}),
+        }}
+        onMouseEnter={() => setHovWishlist(true)}
+        onMouseLeave={() => setHovWishlist(false)}
         onClick={onWishlistToggle}
         aria-label="Open wishlist"
         aria-expanded={wishlistOpen}
@@ -71,13 +94,15 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     fontFamily: 'var(--font-mono)', fontSize: 11,
     letterSpacing: '0.3em', cursor: 'pointer',
+    transition: 'background 0.15s ease, transform 0.12s ease',
   },
   wishlistBtn: {
     display: 'flex', alignItems: 'center',
     padding: '14px 22px',
     background: 'transparent', color: '#fff',
-    border: '1px solid rgba(255,255,255,0.25)',
+    border: '1px solid rgba(255,220,170,0.25)',
     fontFamily: 'var(--font-mono)', fontSize: 11,
     letterSpacing: '0.3em', cursor: 'pointer',
+    transition: 'border-color 0.15s ease, color 0.15s ease, transform 0.12s ease',
   },
 };

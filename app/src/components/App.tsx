@@ -47,7 +47,7 @@ export default function App({ destinations }: AppProps) {
 
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
-  const [spinSpeed, setSpinSpeed] = useState(0.0336);
+  const [spinSpeed, setSpinSpeed] = useState(0.18);
   const [clientReady, setClientReady] = useState(false);
   const [hoveredListId, setHoveredListId] = useState<string | null>(null);
 
@@ -98,7 +98,7 @@ export default function App({ destinations }: AppProps) {
 
   const handleGlobeClick = useCallback((dest: Destination) => {
     handleFly(dest);
-    setTimeout(() => setSelected(dest), 700);
+    setTimeout(() => setSelected(dest), 1200);
   }, [handleFly]);
 
   const toggleWish = useCallback((id: string) => {

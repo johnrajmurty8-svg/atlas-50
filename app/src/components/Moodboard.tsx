@@ -146,7 +146,7 @@ export default function Moodboard({ destination, isWished, onToggleWish, onClose
             <div style={S.heroVeil} />
           </div>
           <div style={S.heroInner}>
-            <div style={S.heroDisplay}>
+            <div style={S.heroDisplay} aria-hidden="true">
               <span style={S.heroDisplayChar}>{destination.name[0]}</span>
               {destination.name[1] && (
                 <span style={S.heroDisplayCharSm}>{destination.name[1].toLowerCase()}</span>
@@ -345,7 +345,7 @@ const S: Record<string, React.CSSProperties> = {
     gap: 7,
     padding: '8px 14px',
     background: 'rgba(7,15,31,0.6)',
-    border: '1px solid rgba(255,255,255,0.18)',
+    border: '1px solid rgba(255,220,170,0.18)',
     cursor: 'pointer',
     fontFamily: 'var(--font-mono)',
     fontSize: 9,
@@ -356,7 +356,7 @@ const S: Record<string, React.CSSProperties> = {
     width: 32,
     height: 32,
     background: 'rgba(7,15,31,0.6)',
-    border: '1px solid rgba(255,255,255,0.18)',
+    border: '1px solid rgba(255,220,170,0.18)',
     cursor: 'pointer',
     color: '#f4ecd4',
     display: 'flex',
@@ -450,7 +450,7 @@ const S: Record<string, React.CSSProperties> = {
   themesBar: {
     height: 8,
     background: 'rgba(244,236,212,0.32)',
-    borderRadius: 4,
+    borderRadius: 0,
     display: 'block',
   },
 
@@ -507,7 +507,7 @@ const S: Record<string, React.CSSProperties> = {
     fontFamily: 'var(--font-sans)',
     fontSize: 13,
     lineHeight: 1.5,
-    color: 'rgba(123, 162, 217, 0.85)',
+    color: 'rgba(255,240,220,0.60)',
   },
 
   // Tile 5 — Itinerary

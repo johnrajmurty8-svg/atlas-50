@@ -2,6 +2,83 @@
 
 ---
 
+## V7 — 2 May 2026
+
+**Change:** Globe Coordinate & FlyTo Math Corrections
+**Brief:** `change-brief-v7.md`
+
+### What Changed
+
+- Corrected the canvas copy in `buildTexture()` to apply the horizontal mirror around x=512 that the in-code comment describes; the previous translation-only implementation (introduced V5, untouched by V6) caused all continents to be painted at the negated longitude, with dots landing in the antipodal ocean
+- Corrected `flyTo()` Y-axis target rotation in `CultureGlobe.tsx` from `-theta + π/2` to `theta - π/2`; the negated formula had been in place since V1 and caused every destination to rotate to its antipodal longitude (the formulas coincide only at lon=±90, which is why earlier testing missed it)
+- V6's shortest-path delta normalisation and the V6 dot-click → flyTo wiring in `App.tsx` are retained as-is; both were correct contributions operating on a broken target value
+
+### What Didn't Change
+
+- `latLonToVec3` formula — locked, not modified
+- d3 projection parameters (`.scale(2048 / (2π)).translate([1024, 512])`) — correct as-is
+- `tmp` canvas drawing pipeline — base fill, hatching, biome bands, coastline all untouched
+- `flyTo` X-axis math (`Math.PI / 2 - phi`) — correct, untouched
+- `flyTo` shortest-path delta normalisation — V6 contribution preserved
+- `onHotspotClick` handler and Moodboard delay — V6 contribution preserved
+- `resume()` API
+- `destinations.json` — coordinates were never the problem
+- Globe geometry, sphere radius, camera FOV, camera position
+- Auto-rotate, halo shader, stars, dot colour, dot pulse
+- Graticule lines
+- All design tokens, fonts
+- `Moodboard`, `SmartPicker`, `WishlistDrawer`, `BottomBar`, `ThemeChips`
+- Yellow viewport frame
+
+### Affected Documents
+
+| Document | Changed |
+|---|---|
+| PRD | No |
+| App Flow | No |
+| UI Guide | No |
+| Backend Spec | No |
+| Security Checklist | No |
+
+---
+
+## V6 — 2 May 2026
+
+**Change:** Globe Coordinate & FlyTo Fixes
+**Brief:** `change-brief-v6.md`
+
+### What Changed
+
+- Verified and corrected `d3.geoEquirectangular` projection parameters in `buildTexture()` so continent land drawn on the equirectangular texture aligns pixel-perfectly with `latLonToVec3` dot positions
+- Audited all destination `lat`/`lon` values in `destinations.json`; corrected any coordinates that placed dots over ocean or coastline
+- Fixed `flyTo()` rotation math in `CultureGlobe`: normalises accumulated `group.rotation.y` and computes shortest angular delta before setting `targetRot`, preventing backward multi-rotation spin
+- Fixed dot click handler in `App`: `onHotspotClick` now calls `flyTo()` and delays Moodboard open by 1200ms, matching list-click behaviour
+
+### What Didn't Change
+
+- `latLonToVec3` formula — locked, not modified
+- `flyTo()` and `resume()` API signatures — unchanged
+- Globe geometry, sphere radius, camera FOV, camera position Z
+- Auto-rotate speed, star density, atmospheric halo shader
+- Hotspot dot colour, radius, halo pulse animation
+- Graticule line colours and opacity
+- All design tokens and font families
+- `Moodboard`, `SmartPicker`, `WishlistDrawer`, `BottomBar`, `ThemeChips`
+- Yellow viewport frame
+- `destinations.json` field schema
+
+### Affected Documents
+
+| Document | Changed |
+|---|---|
+| PRD | No |
+| App Flow | Yes — §2 dot click now triggers flyTo before Moodboard opens |
+| UI Guide | No |
+| Backend Spec | No |
+| Security Checklist | No |
+
+---
+
 ## V5 — 1 May 2026
 
 **Change:** Globe Continent Upgrade (GeoJSON + Biome Texture)

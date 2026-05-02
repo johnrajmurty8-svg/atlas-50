@@ -23,6 +23,9 @@ const CultureGlobe = forwardRef<GlobeRef, CultureGlobeProps>(
     const spinSpeedRef = useRef(spinSpeed);
     useEffect(() => { spinSpeedRef.current = spinSpeed; }, [spinSpeed]);
 
+    const visibleIdsRef = useRef(visibleIds);
+    useEffect(() => { visibleIdsRef.current = visibleIds; }, [visibleIds]);
+
     const worldRef = useRef<Topology | null>(null);
     const [worldReady, setWorldReady] = useState(false);
     useEffect(() => {
@@ -45,9 +48,15 @@ const CultureGlobe = forwardRef<GlobeRef, CultureGlobeProps>(
         if (!s.group) return;
         const phi = (90 - destination.lat) * Math.PI / 180;
         const theta = (destination.lon + 180) * Math.PI / 180;
-        const targetY = -theta + Math.PI / 2;
-        const targetX = Math.PI / 2 - phi;
-        s.targetRot = { x: targetX, y: targetY };
+        const rawTargetY = theta - Math.PI / 2;
+        const rawTargetX = Math.PI / 2 - phi;
+        // Normalise accumulated rotation to [-PI, PI] then take shortest angular delta
+        // to prevent multi-rotation backward spin after heavy user dragging.
+        const currentY = ((s.group.rotation.y % (Math.PI * 2)) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
+        let deltaY = rawTargetY - currentY;
+        if (deltaY >  Math.PI) deltaY -= Math.PI * 2;
+        if (deltaY < -Math.PI) deltaY += Math.PI * 2;
+        s.targetRot = { x: rawTargetX, y: s.group.rotation.y + deltaY };
         s.userPaused = true;
       },
       resume() {
@@ -70,7 +79,7 @@ const CultureGlobe = forwardRef<GlobeRef, CultureGlobeProps>(
 
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(42, W / H, 0.1, 100);
-      camera.position.z = 5.0;
+      camera.position.z = 5.75;
 
       let renderer: THREE.WebGLRenderer;
       try {
@@ -90,16 +99,16 @@ const CultureGlobe = forwardRef<GlobeRef, CultureGlobeProps>(
       const R = 1.4;
 
       const canvas = document.createElement('canvas');
-      canvas.width = 2048;
-      canvas.height = 1024;
+      canvas.width = 4096;
+      canvas.height = 2048;
       const ctx = canvas.getContext('2d')!;
 
       ctx.fillStyle = '#070f1f';
-      ctx.fillRect(0, 0, 2048, 1024);
+      ctx.fillRect(0, 0, 4096, 2048);
 
-      for (let y = 0; y < 1024; y += 8) {
-        ctx.fillStyle = `rgba(30,50,90,${0.04 + 0.025 * Math.sin(y * 0.04)})`;
-        ctx.fillRect(0, y, 2048, 3);
+      for (let y = 0; y < 2048; y += 16) {
+        ctx.fillStyle = `rgba(30,50,90,${0.04 + 0.025 * Math.sin(y * 0.02)})`;
+        ctx.fillRect(0, y, 4096, 6);
       }
 
       if (worldRef.current) {
@@ -111,79 +120,107 @@ const CultureGlobe = forwardRef<GlobeRef, CultureGlobeProps>(
         // with a mirror+offset transform so the result matches Three.js
         // SphereGeometry UV convention (u=0 → lon=0°, increasing westward).
         //
-        // Two-pass copy:  x_main = (3072 - x_tmp) mod 2048
-        //   Pass 1: setTransform(-1,0,0,1,3072,0) → covers canvas x=[1024,2048]
-        //   Pass 2: setTransform(-1,0,0,1,1024,0) → covers canvas x=[0,1024]
+        // Two-pass copy:  x_main = (6144 - x_tmp) mod 4096
+        //   Pass 1: setTransform(-1,0,0,1,6144,0) → covers canvas x=[2048,4096]
+        //   Pass 2: setTransform(-1,0,0,1,2048,0) → covers canvas x=[0,2048]
         const tmp = document.createElement('canvas');
-        tmp.width = 2048; tmp.height = 1024;
+        tmp.width = 4096; tmp.height = 2048;
         const tc = tmp.getContext('2d')!;
 
         const projection = d3.geoEquirectangular()
-          .scale(2048 / (2 * Math.PI))
-          .translate([1024, 512]);
+          .scale(4096 / (2 * Math.PI))
+          .translate([2048, 1024]);
         const path = d3.geoPath(projection, tc);
 
         // Base continent fill
-        tc.fillStyle = '#c9b99a';
+        tc.fillStyle = '#F1E0BA';
         tc.beginPath(); path(land); tc.fill();
 
         // Hand-sketched texture (hatching + stipple, clipped to land)
         tc.save();
         tc.beginPath(); path(land); tc.clip();
         tc.strokeStyle = 'rgba(80,55,20,0.07)';
-        tc.lineWidth = 0.8;
+        tc.lineWidth = 1.6;
         tc.beginPath();
-        for (let i = -1024; i < 3072; i += 9) {
-          tc.moveTo(i, 0); tc.lineTo(i + 1024, 1024);
+        for (let i = -2048; i < 6144; i += 18) {
+          tc.moveTo(i, 0); tc.lineTo(i + 2048, 2048);
         }
         tc.stroke();
         tc.fillStyle = 'rgba(70,45,15,0.10)';
-        for (let i = 0; i < 3000; i++) {
-          tc.fillRect(Math.random() * 2048, Math.random() * 1024, 1, 1);
+        for (let i = 0; i < 12000; i++) {
+          tc.fillRect(Math.random() * 4096, Math.random() * 2048, 2, 2);
         }
         tc.restore();
 
         // Biome lat-band overlays (clipped to land)
         tc.save();
         tc.beginPath(); path(land); tc.clip();
-        tc.fillStyle = 'rgba(230,220,200,0.18)';
-        tc.fillRect(0, 0, 2048, 142); tc.fillRect(0, 882, 2048, 142);
-        tc.fillStyle = 'rgba(195,155,70,0.22)';
-        tc.fillRect(0, 330, 2048, 97);
-        tc.fillStyle = 'rgba(60,50,20,0.15)';
-        tc.fillRect(0, 444, 2048, 136);
-        tc.fillStyle = 'rgba(195,155,70,0.18)';
-        tc.fillRect(0, 597, 2048, 97);
+        // Arctic — full at pole, fades to zero by y=440
+        const arcticGrad = tc.createLinearGradient(0, 0, 0, 440);
+        arcticGrad.addColorStop(0, 'rgba(255,248,240,0.35)');
+        arcticGrad.addColorStop(1, 'rgba(255,248,240,0)');
+        tc.fillStyle = arcticGrad;
+        tc.fillRect(0, 0, 4096, 440);
+        // Antarctic — fades in from y=1608, full at pole
+        const antarcticGrad = tc.createLinearGradient(0, 1608, 0, 2048);
+        antarcticGrad.addColorStop(0, 'rgba(255,248,240,0)');
+        antarcticGrad.addColorStop(1, 'rgba(255,248,240,0.35)');
+        tc.fillStyle = antarcticGrad;
+        tc.fillRect(0, 1608, 4096, 440);
+        // N subtropical desert belt — peaks at Tropic of Cancer (~y=756)
+        const nDesertGrad = tc.createLinearGradient(0, 460, 0, 1024);
+        nDesertGrad.addColorStop(0,   'rgba(130,90,30,0)');
+        nDesertGrad.addColorStop(0.5, 'rgba(163,95,0,0.42)');
+        nDesertGrad.addColorStop(1,   'rgba(130,90,30,0)');
+        tc.fillStyle = nDesertGrad;
+        tc.fillRect(0, 460, 4096, 564);
+        // Equatorial — peaks at equator (y=1024)
+        const equatorialGrad = tc.createLinearGradient(0, 756, 0, 1292);
+        equatorialGrad.addColorStop(0,   'rgba(80,55,15,0)');
+        equatorialGrad.addColorStop(0.5, 'rgba(102,51,0,0.50)');
+        equatorialGrad.addColorStop(1,   'rgba(80,55,15,0)');
+        tc.fillStyle = equatorialGrad;
+        tc.fillRect(0, 756, 4096, 536);
+        // S subtropical desert belt — peaks at Tropic of Capricorn (~y=1292)
+        const sDesertGrad = tc.createLinearGradient(0, 1024, 0, 1608);
+        sDesertGrad.addColorStop(0,   'rgba(130,90,30,0)');
+        sDesertGrad.addColorStop(0.5, 'rgba(163,95,0,0.36)');
+        sDesertGrad.addColorStop(1,   'rgba(130,90,30,0)');
+        tc.fillStyle = sDesertGrad;
+        tc.fillRect(0, 1024, 4096, 584);
         tc.restore();
 
         // Coastline stroke
         tc.strokeStyle = 'rgba(255,220,170,0.55)';
-        tc.lineWidth = 2;
+        tc.lineWidth = 4;
         tc.beginPath(); path(land); tc.stroke();
 
-        // Copy to main canvas shifted by 1024px (180° longitude) so the seam
-        // moves from canvas-center to canvas-edge, matching Three.js UV.
-        // No mirror — continent shapes preserve their natural orientation.
-        ctx.drawImage(tmp, -1024, 0);
-        ctx.drawImage(tmp, 1024, 0);
+        // Copy to main canvas with horizontal mirror (x → 2048-x mod 4096) to
+        // reconcile d3's lon=-180 at x=0 with Three.js sampling lon=0 at x=0.
+        ctx.save();
+        ctx.setTransform(-1, 0, 0, 1, 2048, 0);
+        ctx.drawImage(tmp, 0, 0);
+        ctx.setTransform(-1, 0, 0, 1, 6144, 0);
+        ctx.drawImage(tmp, 0, 0);
+        ctx.restore();
       }
 
       ctx.strokeStyle = 'rgba(255,220,170,0.10)';
-      ctx.lineWidth = 1;
-      for (let lat = 0; lat <= 1024; lat += 1024 / 18) {
-        ctx.beginPath(); ctx.moveTo(0, lat); ctx.lineTo(2048, lat); ctx.stroke();
+      ctx.lineWidth = 2;
+      for (let lat = 0; lat <= 2048; lat += 2048 / 18) {
+        ctx.beginPath(); ctx.moveTo(0, lat); ctx.lineTo(4096, lat); ctx.stroke();
       }
-      for (let lon = 0; lon <= 2048; lon += 2048 / 36) {
-        ctx.beginPath(); ctx.moveTo(lon, 0); ctx.lineTo(lon, 1024); ctx.stroke();
+      for (let lon = 0; lon <= 4096; lon += 4096 / 36) {
+        ctx.beginPath(); ctx.moveTo(lon, 0); ctx.lineTo(lon, 2048); ctx.stroke();
       }
       ctx.strokeStyle = 'rgba(255,210,140,0.28)';
-      ctx.lineWidth = 1.6;
-      [512, 512 * (1 - 23.5 / 90), 512 * (1 + 23.5 / 90)].forEach(y => {
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(2048, y); ctx.stroke();
+      ctx.lineWidth = 3.2;
+      [1024, 1024 * (1 - 23.5 / 90), 1024 * (1 + 23.5 / 90)].forEach(y => {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(4096, y); ctx.stroke();
       });
 
       const tex = new THREE.CanvasTexture(canvas);
-      tex.anisotropy = 8;
+      tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
 
       const earth = new THREE.Mesh(
         new THREE.SphereGeometry(R, 128, 128),
@@ -230,7 +267,7 @@ const CultureGlobe = forwardRef<GlobeRef, CultureGlobeProps>(
 
         const core = new THREE.Mesh(
           new THREE.SphereGeometry(0.014, 16, 16),
-          new THREE.MeshBasicMaterial({ color: 0xffd100 })
+          new THREE.MeshBasicMaterial({ color: 0xc8a200 })
         );
         core.position.copy(pos);
         core.userData = { dest, kind: 'core' };
@@ -239,7 +276,7 @@ const CultureGlobe = forwardRef<GlobeRef, CultureGlobeProps>(
 
         const halo = new THREE.Mesh(
           new THREE.SphereGeometry(0.028, 16, 16),
-          new THREE.MeshBasicMaterial({ color: 0xffd100, transparent: true, opacity: 0.35 })
+          new THREE.MeshBasicMaterial({ color: 0xffd100, transparent: true, opacity: 0.65 })
         );
         halo.position.copy(pos);
         halo.userData = { dest, kind: 'halo', seed: Math.random() * Math.PI * 2 };
@@ -356,27 +393,43 @@ const CultureGlobe = forwardRef<GlobeRef, CultureGlobeProps>(
           s.group.rotation.y += spinSpeedRef.current * dt;
         }
 
-        hotspotGroup.children.forEach(m => {
-          if (m.userData.kind === 'halo') {
-            const mesh = m as THREE.Mesh;
-            const mat = mesh.material as THREE.MeshBasicMaterial;
-            const s2 = 1 + 0.5 * Math.sin(t * 0.003 + m.userData.seed);
-            mesh.scale.setScalar(s2);
-            mat.opacity = 0.2 + 0.25 * (1 - Math.abs(Math.sin(t * 0.003 + m.userData.seed)));
-          }
-        });
+        const vIds = visibleIdsRef.current;
+        const filterActive = vIds.length < destinations.length;
 
-        // Apply visibleIds filtering to hotspot opacity
         hotspotGroup.children.forEach(m => {
-          if (m.userData.kind === 'core' || m.userData.kind === 'halo') {
-            const mesh = m as THREE.Mesh;
-            const mat = mesh.material as THREE.MeshBasicMaterial;
-            const visible = visibleIds.includes(m.userData.dest?.id);
-            if (m.userData.kind === 'core') {
-              mat.opacity = visible ? 1.0 : 0.15;
-              mat.transparent = !visible;
+          const mesh = m as THREE.Mesh;
+          const mat = mesh.material as THREE.MeshBasicMaterial;
+          const isVisible = vIds.includes(m.userData.dest?.id);
+
+          if (m.userData.kind === 'halo') {
+            if (filterActive && isVisible) {
+              // Intense pulse for matched dots — orange glow
+              mat.color.setHex(0xff8c00);
+              const s2 = 1 + 0.8 * Math.abs(Math.sin(t * 0.004 + m.userData.seed));
+              mesh.scale.setScalar(s2);
+              mat.opacity = 0.40 + 0.40 * (1 - Math.abs(Math.sin(t * 0.004 + m.userData.seed)));
+            } else if (filterActive && !isVisible) {
+              mesh.scale.setScalar(1);
+              mat.opacity = 0.02;
             } else {
-              if (!visible) mat.opacity = 0.04;
+              mat.color.setHex(0xffd100);
+              const s2 = 1 + 0.8 * Math.abs(Math.sin(t * 0.004 + m.userData.seed));
+              mesh.scale.setScalar(s2);
+              mat.opacity = 0.40 + 0.40 * (1 - Math.abs(Math.sin(t * 0.004 + m.userData.seed)));
+            }
+          } else if (m.userData.kind === 'core') {
+            if (filterActive && isVisible) {
+              mat.color.setHex(0xff8c00);
+              mat.opacity = 1.0;
+              mat.transparent = false;
+            } else if (filterActive && !isVisible) {
+              mat.color.setHex(0xc8a200);
+              mat.opacity = 0.08;
+              mat.transparent = true;
+            } else {
+              mat.color.setHex(0xc8a200);
+              mat.opacity = 1.0;
+              mat.transparent = false;
             }
           }
         });
