@@ -76,6 +76,7 @@ const CultureGlobe = forwardRef<GlobeRef, CultureGlobeProps>(
     }));
 
     useEffect(() => {
+      if (!worldReady) return;
       const mount = mountRef.current;
       if (!mount) return;
 
@@ -411,7 +412,7 @@ const CultureGlobe = forwardRef<GlobeRef, CultureGlobeProps>(
         if (introActive && s.camera) {
           const elapsed = performance.now() - introStartT;
           const progress = Math.min(elapsed / INTRO_DURATION_MS, 1);
-          const eased = 1 - Math.pow(1 - progress, 5);
+          const eased = progress < 0.5 ? 4 * Math.pow(progress, 3) : 1 - Math.pow(-2 * progress + 2, 3) / 2;
           s.camera.position.z = INTRO_START_Z + (INTRO_END_Z - INTRO_START_Z) * eased;
           if (progress >= 1) {
             s.camera.position.z = INTRO_END_Z;
