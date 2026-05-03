@@ -25,6 +25,36 @@ export interface Destination {
   best_season: Season[];
   environment_tags: EnvironmentTag[];
   group_size_tags: GroupSizeTag[];
+  // V9 fields — optional for graceful fallback on records without them
+  monthly_temps?: number[];
+  peak_months?: number[];
+  crowd_index?: number[];
+  vibe_scores?: {
+    cultural: number;
+    romantic: number;
+    social: number;
+    spiritual: number;
+    adventure: number;
+  };
+  cost_breakdown?: {
+    accommodation: number;
+    food: number;
+    activities: number;
+    transport: number;
+    other: number;
+  };
+  cost_breakdown_amounts?: {
+    accommodation: string;
+    food: string;
+    activities: string;
+    transport: string;
+    other: string;
+  };
+  cost_daily_total?: string;
+  cost_budget_daily?: string;
+  timezone?: string;
+  flight_time_lhr?: string;
+  globe_path?: string;
 }
 
 export interface SmartPickerState {

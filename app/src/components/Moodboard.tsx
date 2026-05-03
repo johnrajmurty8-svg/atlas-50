@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Destination } from '../lib/types';
 
 interface MoodboardProps {
@@ -10,75 +10,612 @@ interface MoodboardProps {
   onClose: () => void;
 }
 
-function RegionGlobe({ lat, lon }: { lat: number; lon: number }) {
-  const r = 70;
-  const cx = 90, cy = 90;
-  const dotX = cx, dotY = cy;
-  void lat; void lon; // used for display only in V3; dot is always centred
+// ─── Design tokens shared by all Bin 4 card components ───────
+const T = {
+  bg:         '#070f1f',
+  bgDeep:     '#040d1e',
+  cream:      '#f4ecd4',
+  creamDim:   'rgba(240,232,208,0.65)',
+  creamFaint: 'rgba(244,236,212,0.28)',
+  amber:      '#ffd100',
+  amberHi:    'rgba(255,209,0,0.82)',
+  amberMid:   'rgba(255,209,0,0.72)',
+  amberLo:    'rgba(255,209,0,0.42)',
+  blue:       'rgba(140,185,255,0.62)',
+  blueMid:    'rgba(140,185,255,0.30)',
+  blueAtm1:   'rgba(110,165,255,0.23)',
+  blueAtm2:   'rgba(110,165,255,0.10)',
+  blueAtm3:   'rgba(110,165,255,0.04)',
+  blueSeason: 'rgba(140,185,255,0.26)',
+  other:      'rgba(255,220,170,0.16)',
+  fontSerif:  "'DM Serif Display', serif",
+  fontSans:   "'Inter', sans-serif",
+  fontMono:   "'JetBrains Mono', monospace",
+};
+
+const CARD_NAMES = [
+  'GLOBE — LOCATION',
+  'SEASON WHEEL',
+  'VIBE RADAR',
+  'CROWD CALENDAR',
+  'COST BREAKDOWN',
+];
+
+// ─── Card 1: Globe ────────────────────────────────────────────
+function GlobeCard({ d }: { d: Destination }) {
+  const [localTime, setLocalTime] = useState('—');
+  const rotRef1 = useRef<SVGGElement>(null);
+  const rotRef2 = useRef<SVGGElement>(null);
+
+  useEffect(() => {
+    const fmt = () => {
+      if (!d.timezone) return '—';
+      try {
+        return new Intl.DateTimeFormat('en-US', {
+          timeZone: d.timezone,
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        }).format(new Date());
+      } catch { return '—'; }
+    };
+    setLocalTime(fmt());
+    const id = setInterval(() => setLocalTime(fmt()), 30000);
+    return () => clearInterval(id);
+  }, [d.timezone]);
+
+  useEffect(() => {
+    const period = 421; // 2π × R(67) — full equatorial circumference in SVG px
+    let dx = 0;
+    let rafId: number;
+    const tick = () => {
+      dx -= 1.0;
+      if (dx <= -period) dx += period;
+      rotRef1.current?.setAttribute('transform', `translate(${dx.toFixed(1)},0)`);
+      rotRef2.current?.setAttribute('transform', `translate(${(dx + period).toFixed(1)},0)`);
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, []);
+
+  const CX = 93, CY = 86, R = 67;
+  const latStr = `${Math.abs(d.lat).toFixed(1)}°${d.lat >= 0 ? 'N' : 'S'}`;
+  const lonStr = `${Math.abs(d.lon).toFixed(1)}°${d.lon >= 0 ? 'E' : 'W'}`;
+
   return (
-    <svg viewBox="0 0 180 180" style={{ width: '68%', maxWidth: 200, opacity: 0.95 }}>
-      <defs>
-        <radialGradient id="rgGlow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#ffd100" stopOpacity="0.45" />
-          <stop offset="60%" stopColor="#ffd100" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-      <circle cx={cx} cy={cy} r={r + 18} fill="url(#rgGlow)" />
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255,220,170,0.28)" strokeWidth="0.8" />
-      {([-60, -30, 0, 30, 60] as number[]).map(l => {
-        const ry = r * Math.cos(l * Math.PI / 180);
-        const oy = cy + r * Math.sin(l * Math.PI / 180) * 0.6;
-        return (
-          <ellipse key={l} cx={cx} cy={oy}
-            rx={r * Math.cos(l * Math.PI / 180)} ry={ry * 0.18}
-            fill="none" stroke="rgba(255,220,170,0.16)" strokeWidth="0.5" />
-        );
-      })}
-      {([0, 30, 60, 90, 120, 150] as number[]).map(l => (
-        <ellipse key={l} cx={cx} cy={cy}
-          rx={r * Math.abs(Math.sin(l * Math.PI / 180)) || 0.5} ry={r}
-          fill="none" stroke="rgba(255,220,170,0.16)" strokeWidth="0.5" />
-      ))}
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255,220,170,0.45)" strokeWidth="1" />
-      <circle cx={dotX} cy={dotY} r="9" fill="#ffd100" opacity="0.18">
-        <animate attributeName="r" from="6" to="14" dur="2s" repeatCount="indefinite" />
-        <animate attributeName="opacity" from="0.4" to="0" dur="2s" repeatCount="indefinite" />
-      </circle>
-      <circle cx={dotX} cy={dotY} r="3" fill="#ffd100" />
-      <circle cx={dotX} cy={dotY} r="3" fill="none" stroke="#fff7d0" strokeWidth="0.6" />
-    </svg>
+    <>
+      <div style={{ fontFamily: T.fontMono, fontSize: 13, letterSpacing: '0.12em', color: T.amber, textTransform: 'uppercase', marginBottom: 7 }}>
+        01 of 05 — Location
+      </div>
+      <div style={{ fontFamily: T.fontSerif, fontSize: 27, color: '#f0e8d0', marginBottom: 4, paddingRight: 70 }}>
+        {d.region} · {d.name}
+      </div>
+      <div style={{ fontFamily: T.fontSans, fontSize: 16, color: T.creamDim, letterSpacing: '0.03em', marginBottom: 15 }}>
+        {latStr} · {lonStr}
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'center', flex: 1, alignItems: 'center' }}>
+        <svg width={308} height={288} viewBox="0 0 186 172">
+          <defs>
+            <clipPath id="gc">
+              <circle cx={CX} cy={CY} r={R} />
+            </clipPath>
+          </defs>
+          {/* Atmosphere rings */}
+          <circle cx={CX} cy={CY} r={R + 3.5}  fill="none" stroke={T.blueAtm1} strokeWidth={3.5} />
+          <circle cx={CX} cy={CY} r={R + 7.5}  fill="none" stroke={T.blueAtm2} strokeWidth={3.5} />
+          <circle cx={CX} cy={CY} r={R + 12}   fill="none" stroke={T.blueAtm3} strokeWidth={5} />
+          {/* Globe base */}
+          <circle cx={CX} cy={CY} r={R} fill={T.bgDeep} />
+          <g clipPath="url(#gc)">
+            {/* Static latitude lines — these are geographic constants, don't rotate */}
+            <path d="M26,67 C59,108 127,108 160,67" fill="none" stroke="rgba(255,220,170,0.20)" strokeWidth={0.6} strokeDasharray="2.5,2.5" />
+            <path d="M26,86 C59,132 127,132 160,86" fill="none" stroke="rgba(255,220,170,0.12)" strokeWidth={0.6} strokeDasharray="2.5,2.5" />
+            {/* Rotating group 1 — longitude lines + country silhouette */}
+            <g ref={rotRef1}>
+              <ellipse cx={CX} cy={CY} rx={33.5} ry={R} fill="none" stroke="rgba(255,220,170,0.05)" strokeWidth={0.5} />
+              <ellipse cx={CX} cy={CY} rx={58}   ry={R} fill="none" stroke="rgba(255,220,170,0.04)" strokeWidth={0.5} />
+              <line x1={CX} y1={CY - R} x2={CX} y2={CY + R} stroke="rgba(255,220,170,0.05)" strokeWidth={0.5} />
+              {d.globe_path && <path d={d.globe_path} fill="rgba(255,209,0,0.68)" stroke="rgba(255,209,0,0.20)" strokeWidth={0.5} />}
+            </g>
+            {/* Rotating group 2 — duplicate offset by one full period for seamless loop */}
+            <g ref={rotRef2} transform="translate(421,0)">
+              <ellipse cx={CX} cy={CY} rx={33.5} ry={R} fill="none" stroke="rgba(255,220,170,0.05)" strokeWidth={0.5} />
+              <ellipse cx={CX} cy={CY} rx={58}   ry={R} fill="none" stroke="rgba(255,220,170,0.04)" strokeWidth={0.5} />
+              <line x1={CX} y1={CY - R} x2={CX} y2={CY + R} stroke="rgba(255,220,170,0.05)" strokeWidth={0.5} />
+              {d.globe_path && <path d={d.globe_path} fill="rgba(255,209,0,0.68)" stroke="rgba(255,209,0,0.20)" strokeWidth={0.5} />}
+            </g>
+          </g>
+          {/* Globe edge */}
+          <circle cx={CX} cy={CY} r={R} fill="none" stroke="rgba(255,220,170,0.22)" strokeWidth={0.5} />
+          {/* Destination pin with two pulsing halos */}
+          <circle cx={CX} cy={84} r={3.5} fill={T.amber} />
+          <circle cx={CX} cy={84} r={7.5} fill="none" stroke="rgba(255,209,0,0.48)" strokeWidth={0.9} />
+          <circle cx={CX} cy={84} r={12}  fill="none" stroke="rgba(255,209,0,0.18)" strokeWidth={0.6} />
+        </svg>
+      </div>
+
+      {/* Bottom info strip */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '0.5px solid rgba(255,220,170,0.10)', paddingTop: 15, marginTop: 12, flexShrink: 0 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span style={{ fontFamily: T.fontMono, fontSize: 12, color: T.creamFaint, letterSpacing: '0.08em' }}>
+            LOCAL TIME · {d.name.toUpperCase()}
+          </span>
+          <span style={{ fontFamily: T.fontSerif, fontSize: 22, color: T.cream }}>{localTime}</span>
+        </div>
+        <div style={{ width: 0.5, height: 42, background: 'rgba(255,220,170,0.10)' }} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, textAlign: 'right' }}>
+          <span style={{ fontFamily: T.fontMono, fontSize: 12, color: T.creamFaint, letterSpacing: '0.08em' }}>FROM LHR</span>
+          <span style={{ fontFamily: T.fontSerif, fontSize: 22, color: T.cream }}>{d.flight_time_lhr ?? '—'}</span>
+        </div>
+      </div>
+    </>
   );
 }
 
-export default function Moodboard({ destination, isWished, onToggleWish, onClose }: MoodboardProps) {
-  const [mounted, setMounted] = useState(false);
-  const [hoveredTile, setHoveredTile] = useState<number | null>(null);
+// ─── Card 2: Season Wheel ─────────────────────────────────────
+function SeasonWheelCard({ d }: { d: Destination }) {
+  const MONTHS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+  const MONTH_NAMES = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  const CX = 100, CY = 100, R_OUT = 62, R_IN = 38, R_TEMP = 82;
 
+  const peakMonths = d.peak_months ?? [];
+  const temps = d.monthly_temps ?? [];
+
+  if (peakMonths.length === 0 || temps.length === 0) {
+    return (
+      <>
+        <div style={{ fontFamily: T.fontMono, fontSize: 13, letterSpacing: '0.12em', color: T.amber, textTransform: 'uppercase', marginBottom: 7 }}>
+          02 of 05 — Best Season
+        </div>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.creamFaint, fontFamily: T.fontMono, fontSize: 15 }}>—</div>
+      </>
+    );
+  }
+
+  const peakStart = MONTH_NAMES[peakMonths[0]];
+  const peakEnd   = MONTH_NAMES[peakMonths[peakMonths.length - 1]];
+
+  const segments = MONTHS.map((m, i) => {
+    const a0   = (i / 12) * Math.PI * 2 - Math.PI / 2;
+    const a1   = ((i + 0.85) / 12) * Math.PI * 2 - Math.PI / 2;
+    const aMid = ((i + 0.5)  / 12) * Math.PI * 2 - Math.PI / 2;
+    const isPeak = peakMonths.includes(i);
+    const temp = temps[i] ?? 0;
+    const warmRatio = Math.max(0, Math.min(1, (temp - 5) / 28));
+
+    const x1 = CX + Math.cos(a0) * R_IN,  y1 = CY + Math.sin(a0) * R_IN;
+    const x2 = CX + Math.cos(a0) * R_OUT, y2 = CY + Math.sin(a0) * R_OUT;
+    const x3 = CX + Math.cos(a1) * R_OUT, y3 = CY + Math.sin(a1) * R_OUT;
+    const x4 = CX + Math.cos(a1) * R_IN,  y4 = CY + Math.sin(a1) * R_IN;
+    const pathD = `M${x1.toFixed(2)},${y1.toFixed(2)} L${x2.toFixed(2)},${y2.toFixed(2)} A${R_OUT},${R_OUT},0,0,1,${x3.toFixed(2)},${y3.toFixed(2)} L${x4.toFixed(2)},${y4.toFixed(2)} A${R_IN},${R_IN},0,0,0,${x1.toFixed(2)},${y1.toFixed(2)}Z`;
+
+    const mx = CX + Math.cos(aMid) * (R_IN + (R_OUT - R_IN) * 0.5);
+    const my = CY + Math.sin(aMid) * (R_IN + (R_OUT - R_IN) * 0.5);
+    const tx = CX + Math.cos(aMid) * R_TEMP;
+    const ty = CY + Math.sin(aMid) * R_TEMP;
+
+    return { m, i, isPeak, temp, warmRatio, pathD, mx, my, tx, ty };
+  });
+
+  return (
+    <>
+      <div style={{ fontFamily: T.fontMono, fontSize: 13, letterSpacing: '0.12em', color: T.amber, textTransform: 'uppercase', marginBottom: 7 }}>
+        02 of 05 — Best Season
+      </div>
+      <div style={{ fontFamily: T.fontSerif, fontSize: 27, color: '#f0e8d0', marginBottom: 4, paddingRight: 70 }}>
+        {peakStart} → {peakEnd}
+      </div>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
+        <svg width={350} height={350} viewBox="0 0 200 200" style={{ marginTop: -19 }}>
+          {segments.map(({ i, isPeak, pathD, mx, my, tx, ty, m, temp, warmRatio }) => (
+            <g key={i}>
+              <path d={pathD} fill={isPeak ? T.amberMid : T.blueSeason} stroke={T.bg} strokeWidth={1.5} />
+              <text x={mx} y={my + 3} textAnchor="middle" fontFamily={T.fontMono} fontSize={7}
+                fill={isPeak ? 'rgba(7,15,31,0.9)' : 'rgba(160,200,255,0.7)'}>
+                {m}
+              </text>
+              <text x={tx} y={ty + 3} textAnchor="middle" fontFamily={T.fontMono} fontSize={9}
+                fill={isPeak
+                  ? `rgba(255,209,0,${(0.5 + warmRatio * 0.5).toFixed(2)})`
+                  : `rgba(140,195,255,${(0.38 + (1 - warmRatio) * 0.3).toFixed(2)})`}>
+                {temp}°
+              </text>
+            </g>
+          ))}
+          <circle cx={CX} cy={CY} r={R_OUT} fill="none" stroke="rgba(255,220,170,0.12)" strokeWidth={0.5} />
+          <circle cx={CX} cy={CY} r={R_IN}  fill={T.bg} stroke="rgba(255,220,170,0.10)" strokeWidth={0.5} />
+          <text x={CX} y={CY - 3} textAnchor="middle" fontFamily={T.fontMono} fontSize={7}
+            fill="rgba(244,236,212,0.20)" letterSpacing="0.1em">AVG</text>
+          <text x={CX} y={CY + 9} textAnchor="middle" fontFamily={T.fontMono} fontSize={7}
+            fill="rgba(244,236,212,0.20)" letterSpacing="0.1em">°C</text>
+        </svg>
+      </div>
+
+      <div style={{ display: 'flex', gap: 20, flexShrink: 0 }}>
+        {[
+          { color: T.amberMid,   label: 'PEAK' },
+          { color: T.blueSeason, label: 'OFF SEASON' },
+        ].map(({ color, label }) => (
+          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            <div style={{ width: 12, height: 12, background: color }} />
+            <span style={{ fontFamily: T.fontMono, fontSize: 12, color: 'rgba(244,236,212,0.35)', letterSpacing: '0.06em' }}>{label}</span>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+// ─── Card 3: Vibe Radar ───────────────────────────────────────
+function VibeRadarCard({ d }: { d: Destination }) {
+  const AXES = [
+    { key: 'cultural'  as const, label: 'CULTURAL',  offsetX: 0,   offsetY: -80 },
+    { key: 'romantic'  as const, label: 'ROMANTIC',  offsetX: 76,  offsetY: -27 },
+    { key: 'social'    as const, label: 'SOCIAL',    offsetX: 48,  offsetY: 55  },
+    { key: 'spiritual' as const, label: 'SPIRITUAL', offsetX: -48, offsetY: 55  },
+    { key: 'adventure' as const, label: 'ADVENTURE', offsetX: -78, offsetY: -27 },
+  ];
+  const N = 5, R = 60, CX = 120, CY = 110;
+
+  if (!d.vibe_scores) {
+    return (
+      <>
+        <div style={{ fontFamily: T.fontMono, fontSize: 13, letterSpacing: '0.12em', color: T.amber, textTransform: 'uppercase', marginBottom: 7 }}>
+          03 of 05 — Vibe Fingerprint
+        </div>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.creamFaint, fontFamily: T.fontMono, fontSize: 15 }}>—</div>
+      </>
+    );
+  }
+
+  const gridRings = [0.33, 0.66, 1].map(s =>
+    Array.from({ length: N }, (_, i) => {
+      const a = (i / N) * Math.PI * 2 - Math.PI / 2;
+      return `${(Math.cos(a) * R * s).toFixed(2)},${(Math.sin(a) * R * s).toFixed(2)}`;
+    }).join(' ')
+  );
+
+  const filledPoints = AXES.map(({ key }, i) => {
+    const a = (i / N) * Math.PI * 2 - Math.PI / 2;
+    const v = d.vibe_scores![key];
+    return `${(Math.cos(a) * R * v).toFixed(2)},${(Math.sin(a) * R * v).toFixed(2)}`;
+  }).join(' ');
+
+  const dots = AXES.map(({ key }, i) => {
+    const a = (i / N) * Math.PI * 2 - Math.PI / 2;
+    const v = d.vibe_scores![key];
+    return { cx: Math.cos(a) * R * v, cy: Math.sin(a) * R * v };
+  });
+
+  const topVibes = Object.entries(d.vibe_scores)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 3)
+    .map(([k]) => k.charAt(0).toUpperCase() + k.slice(1))
+    .join(' · ');
+
+  return (
+    <>
+      <div style={{ fontFamily: T.fontMono, fontSize: 13, letterSpacing: '0.12em', color: T.amber, textTransform: 'uppercase', marginBottom: 7 }}>
+        03 of 05 — Vibe Fingerprint
+      </div>
+      <div style={{ fontFamily: T.fontSerif, fontSize: 27, color: '#f0e8d0', marginBottom: 4, paddingRight: 70 }}>{d.name}</div>
+      <div style={{ fontFamily: T.fontSans, fontSize: 16, color: T.creamDim, marginBottom: 15 }}>{topVibes}</div>
+
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <svg width={461} height={408} viewBox="0 0 240 212" style={{ marginTop: -38 }}>
+          <g transform={`translate(${CX},${CY})`}>
+            {gridRings.map((pts, i) => (
+              <polygon key={i} points={pts} fill="none" stroke="rgba(255,255,255,0.20)" strokeWidth={0.5} />
+            ))}
+            {AXES.map(({ key }, i) => {
+              const a = (i / N) * Math.PI * 2 - Math.PI / 2;
+              return (
+                <line key={key} x1={0} y1={0}
+                  x2={parseFloat((Math.cos(a) * R).toFixed(2))}
+                  y2={parseFloat((Math.sin(a) * R).toFixed(2))}
+                  stroke="rgba(255,255,255,0.15)" strokeWidth={0.5} />
+              );
+            })}
+            <polygon points={filledPoints} fill="rgba(255,209,0,0.10)" stroke={T.amber} strokeWidth={1} />
+            {dots.map((dot, i) => (
+              <circle key={i} cx={dot.cx} cy={dot.cy} r={2.5} fill={T.amber} />
+            ))}
+            {AXES.map(({ label, offsetX, offsetY, key }) => (
+              <text key={key} x={offsetX} y={offsetY}
+                textAnchor={offsetX < 0 ? 'end' : offsetX > 0 ? 'start' : 'middle'}
+                fontFamily={T.fontMono} fontSize={8} fill="rgba(240,232,208,0.85)">
+                {label}
+              </text>
+            ))}
+          </g>
+        </svg>
+      </div>
+    </>
+  );
+}
+
+// ─── Card 4: Crowd Calendar ───────────────────────────────────
+function CrowdCalendarCard({ d }: { d: Destination }) {
+  const BAR_W = 22, MAX_H = 179, GAP = 5, START_X = 6;
+  const SVG_W = 346, SVG_H = 240;
+
+  if (!d.crowd_index || d.crowd_index.length < 12) {
+    return (
+      <>
+        <div style={{ fontFamily: T.fontMono, fontSize: 13, letterSpacing: '0.12em', color: T.amber, textTransform: 'uppercase', marginBottom: 7 }}>
+          04 of 05 — Crowd Index
+        </div>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.creamFaint, fontFamily: T.fontMono, fontSize: 15 }}>—</div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div style={{ fontFamily: T.fontMono, fontSize: 13, letterSpacing: '0.12em', color: T.amber, textTransform: 'uppercase', marginBottom: 7 }}>
+        04 of 05 — Crowd Index
+      </div>
+      <div style={{ fontFamily: T.fontSerif, fontSize: 27, color: '#f0e8d0', marginBottom: 4, paddingRight: 70 }}>When to Go</div>
+      <div style={{ fontFamily: T.fontSans, fontSize: 16, color: T.creamDim, marginBottom: 15 }}>
+        Bar height = tourist volume
+      </div>
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: 8 }}>
+        <svg width={SVG_W} viewBox={`0 0 ${SVG_W} ${SVG_H}`}>
+          {d.crowd_index.map((v, i) => {
+            const barH  = Math.round((v / 10) * MAX_H);
+            const x     = START_X + i * (BAR_W + GAP);
+            const alpha = 0.10 + (v / 10) * 0.72;
+            return (
+              <rect key={i}
+                x={x} y={MAX_H - barH + 10}
+                width={BAR_W} height={barH}
+                fill={`rgba(255,209,0,${alpha.toFixed(2)})`}
+                stroke="rgba(255,220,170,0.08)" strokeWidth={0.5}
+              />
+            );
+          })}
+        </svg>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', width: 346, padding: '0 2px' }}>
+          {['JAN', 'JUN', 'DEC'].map(m => (
+            <span key={m} style={{ fontFamily: T.fontMono, fontSize: 12, color: 'rgba(240,232,208,0.65)', letterSpacing: '0.06em' }}>{m}</span>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: 346 }}>
+          <span style={{ fontFamily: T.fontMono, fontSize: 12, color: 'rgba(240,232,208,0.65)' }}>QUIET</span>
+          <div style={{ flex: 1, height: 3, background: 'linear-gradient(to right,rgba(255,220,170,0.12),rgba(255,209,0,0.70))' }} />
+          <span style={{ fontFamily: T.fontMono, fontSize: 12, color: 'rgba(240,232,208,0.65)' }}>BUSY</span>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── Card 5: Cost Breakdown ───────────────────────────────────
+function CostBreakdownCard({ d }: { d: Destination }) {
+  const CX = 85, CY = 85, R_OUT = 75, R_IN = 45;
+
+  const SEGMENTS = [
+    { key: 'accommodation' as const, label: 'ACCOMMODATION', color: T.amberHi },
+    { key: 'food'          as const, label: 'FOOD & DRINK',  color: T.amberLo },
+    { key: 'activities'    as const, label: 'ACTIVITIES',    color: T.blue    },
+    { key: 'transport'     as const, label: 'TRANSPORT',     color: T.blueMid },
+    { key: 'other'         as const, label: 'OTHER',         color: T.other   },
+  ];
+
+  if (!d.cost_breakdown || !d.cost_breakdown_amounts) {
+    return (
+      <>
+        <div style={{ fontFamily: T.fontMono, fontSize: 13, letterSpacing: '0.12em', color: T.amber, textTransform: 'uppercase', marginBottom: 7 }}>
+          05 of 05 — Cost Breakdown
+        </div>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.creamFaint, fontFamily: T.fontMono, fontSize: 15 }}>—</div>
+      </>
+    );
+  }
+
+  let angle = -Math.PI / 2;
+  const arcs = SEGMENTS.map(seg => {
+    const pct   = d.cost_breakdown![seg.key] / 100;
+    const sweep = pct * Math.PI * 2;
+    const GAP   = 0.03;
+    const a0    = angle + GAP;
+    const a1    = angle + sweep - GAP;
+    const large = sweep > Math.PI ? 1 : 0;
+
+    const x1 = CX + Math.cos(a0) * R_IN,  y1 = CY + Math.sin(a0) * R_IN;
+    const x2 = CX + Math.cos(a0) * R_OUT, y2 = CY + Math.sin(a0) * R_OUT;
+    const x3 = CX + Math.cos(a1) * R_OUT, y3 = CY + Math.sin(a1) * R_OUT;
+    const x4 = CX + Math.cos(a1) * R_IN,  y4 = CY + Math.sin(a1) * R_IN;
+    const pathD = `M${x1.toFixed(2)},${y1.toFixed(2)} L${x2.toFixed(2)},${y2.toFixed(2)} A${R_OUT},${R_OUT},0,${large},1,${x3.toFixed(2)},${y3.toFixed(2)} L${x4.toFixed(2)},${y4.toFixed(2)} A${R_IN},${R_IN},0,${large},0,${x1.toFixed(2)},${y1.toFixed(2)}Z`;
+
+    angle += sweep;
+    return { ...seg, pathD, pct };
+  });
+
+  return (
+    <>
+      <div style={{ fontFamily: T.fontMono, fontSize: 13, letterSpacing: '0.12em', color: T.amber, textTransform: 'uppercase', marginBottom: 7 }}>
+        05 of 05 — Cost Breakdown
+      </div>
+      <div style={{ fontFamily: T.fontSerif, fontSize: 27, color: '#f0e8d0', marginBottom: 4, paddingRight: 70 }}>
+        Est. Daily Spend
+      </div>
+      <div style={{ fontFamily: T.fontSans, fontSize: 16, color: T.creamDim, marginBottom: 15 }}>
+        Per person · {d.name}
+      </div>
+
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 18 }}>
+        {/* Donut SVG */}
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <svg width={171} height={171} viewBox="0 0 171 171">
+            {arcs.map(({ key, pathD, color }) => (
+              <path key={key} d={pathD} fill={color} stroke={T.bg} strokeWidth={1.5} />
+            ))}
+          </svg>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+            <span style={{ fontFamily: T.fontMono, fontSize: 10, color: 'rgba(244,236,212,0.28)', letterSpacing: '0.07em' }}>EST/DAY</span>
+            <span style={{ fontFamily: T.fontSerif, fontSize: 27, color: T.cream, lineHeight: 1.1 }}>{d.cost_daily_total ?? '—'}</span>
+            <span style={{ fontFamily: T.fontMono, fontSize: 9, color: 'rgba(244,236,212,0.22)', letterSpacing: '0.06em' }}>PER PERSON</span>
+          </div>
+        </div>
+
+        {/* Legend */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          {arcs.map(({ key, label, color, pct }) => (
+            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 9 }}>
+              <div style={{ width: 8, height: 8, background: color, flexShrink: 0 }} />
+              <span style={{ fontFamily: T.fontMono, fontSize: 13, color: 'rgba(240,232,208,0.90)', letterSpacing: '0.05em', flex: 1 }}>{label}</span>
+              <span style={{ fontFamily: T.fontMono, fontSize: 13, color: '#f0e8d0' }}>{Math.round(pct * 100)}%</span>
+              <span style={{ fontFamily: T.fontMono, fontSize: 13, color: 'rgba(240,232,208,0.55)', minWidth: 51, textAlign: 'right' }}>
+                {d.cost_breakdown_amounts![key]}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ borderTop: '0.5px solid rgba(255,220,170,0.08)', marginTop: 14, paddingTop: 14, display: 'flex', justifyContent: 'space-between', flexShrink: 0 }}>
+        <span style={{ fontFamily: T.fontMono, fontSize: 12, color: 'rgba(244,236,212,0.22)', letterSpacing: '0.05em' }}>BUDGET TRAVELLER</span>
+        <span style={{ fontFamily: T.fontMono, fontSize: 12, color: 'rgba(244,236,212,0.22)', letterSpacing: '0.05em' }}>{d.cost_budget_daily ?? '—'}</span>
+      </div>
+    </>
+  );
+}
+
+// ─── Bin 4: 5-card paginated location widget ──────────────────
+function Bin4LocationWidget({ d, cur, setCur }: { d: Destination; cur: number; setCur: (n: number) => void }) {
+  const total = 5;
+  const prev  = () => setCur((cur + total - 1) % total);
+  const next  = () => setCur((cur + 1) % total);
+
+  const CARDS = [
+    <GlobeCard         key="globe"  d={d} />,
+    <SeasonWheelCard   key="season" d={d} />,
+    <VibeRadarCard     key="vibe"   d={d} />,
+    <CrowdCalendarCard key="crowd"  d={d} />,
+    <CostBreakdownCard key="cost"   d={d} />,
+  ];
+
+  const btnStyle: React.CSSProperties = {
+    width: 26, height: 26,
+    background: 'rgba(255,220,170,0.06)',
+    border: '0.5px solid rgba(255,220,170,0.18)',
+    color: 'rgba(244,236,212,0.60)',
+    fontSize: 15, cursor: 'pointer',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    transition: 'all 0.15s',
+    fontFamily: "'Inter', sans-serif",
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Card frame */}
+      <div style={{ position: 'relative', flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {CARDS.map((card, i) => (
+          <div key={i} style={{
+            position: 'absolute', inset: 0,
+            display: 'flex', flexDirection: 'column',
+            opacity: i === cur ? 1 : 0,
+            pointerEvents: i === cur ? 'auto' : 'none',
+            transition: 'opacity 0.4s ease',
+          }}>
+            {card}
+          </div>
+        ))}
+
+        {/* Nav — absolutely positioned top-right, overlays all cards */}
+        <div style={{ position: 'absolute', top: 16, right: 16, zIndex: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button style={btnStyle} onClick={prev}>‹</button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {Array.from({ length: total }, (_, i) => (
+              <div key={i} onClick={() => setCur(i)} style={{
+                width: 5, height: 5, borderRadius: '50%', cursor: 'pointer',
+                background: i === cur ? T.amber : 'rgba(255,220,170,0.18)',
+                transition: 'background 0.3s',
+              }} />
+            ))}
+          </div>
+          <button style={btnStyle} onClick={next}>›</button>
+        </div>
+      </div>
+
+      {/* Meta label row — counter only, right-aligned */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 9, flexShrink: 0 }}>
+        <span style={{ fontFamily: T.fontMono, fontSize: 13, color: 'rgba(244,236,212,0.28)', letterSpacing: '0.08em' }}>
+          {String(cur + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Moodboard component ─────────────────────────────────
+export default function Moodboard({ destination, isWished, onToggleWish, onClose }: MoodboardProps) {
+  const [mounted,        setMounted]        = useState(false);
+  const [hoveredTile,    setHoveredTile]    = useState<number | null>(null);
+  // Bin 1 carousel state
+  const [carouselIdx,    setCarouselIdx]    = useState(0);
+  const [carouselPaused, setCarouselPaused] = useState(false);
+  const [carouselHover,  setCarouselHover]  = useState<'prev' | 'next' | null>(null);
+  // Bin 4 widget state
+  const [bin4Cur,        setBin4Cur]        = useState(0);
+
+  // Reset all per-destination state when destination changes
   useEffect(() => {
     setMounted(false);
+    setCarouselIdx(0);
+    setCarouselPaused(false);
+    setBin4Cur(0);
     const t = requestAnimationFrame(() => setMounted(true));
     return () => cancelAnimationFrame(t);
   }, [destination.id]);
 
+  // Escape key to close
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  // Inject animation + carousel button hover CSS
   useEffect(() => {
     if (!document.getElementById('moodboard-anim')) {
       const s = document.createElement('style');
       s.id = 'moodboard-anim';
-      s.textContent = '@keyframes mb-fade { from { opacity:0 } to { opacity:1 } }';
+      s.textContent = [
+        '@keyframes mb-fade { from { opacity:0 } to { opacity:1 } }',
+        '.mb-carousel-btn:hover { color: #f4ecd4 !important; }',
+      ].join('\n');
       document.head.appendChild(s);
     }
   }, []);
 
-  const img = destination.images;
-  const issueNo = String((destination.id.length * 7 % 80) + 10).padStart(3, '0');
+  // Preload all 5 carousel images for this destination
+  useEffect(() => {
+    destination.images.slice(0, 5).forEach(src => {
+      const img = new window.Image();
+      img.src = src;
+    });
+  }, [destination.images]);
+
+  // Carousel auto-advance — 6.5s interval, pauses when carouselPaused
+  useEffect(() => {
+    if (carouselPaused) return;
+    const count = Math.min(destination.images.length, 5);
+    const id = setInterval(() => setCarouselIdx(i => (i + 1) % count), 6500);
+    return () => clearInterval(id);
+  }, [carouselPaused, destination.images.length]);
+
+  const imgCount = Math.min(destination.images.length, 5);
+  const img      = destination.images;
+  const issueNo  = String((destination.id.length * 7 % 80) + 10).padStart(3, '0');
   const weatherTemp = destination.weather.split('·')[0].trim();
-  const weatherSub = destination.weather.split('·').slice(1).join(' · ').trim() || 'Mediterranean climate';
+  const weatherSub  = destination.weather.split('·').slice(1).join(' · ').trim() || 'Mediterranean climate';
 
   const tile = (i: number, hovered = false): React.CSSProperties => ({
     opacity: mounted ? 1 : 0,
@@ -138,11 +675,20 @@ export default function Moodboard({ destination, isWished, onToggleWish, onClose
       {/* Bento grid — 12 cols × 6 rows */}
       <div style={S.grid}>
 
-        {/* TILE 1 — Hero: image + giant first-letter typography */}
+        {/* TILE 1 — Hero: ambient crossfade carousel */}
+        {/* TODO: clicking this bin should open a full-screen image collage view (V10) */}
         <div style={{ ...S.cell, ...S.tileHero, ...tile(0, hoveredTile === 0) }}
-          onMouseEnter={() => setHoveredTile(0)} onMouseLeave={() => setHoveredTile(null)}>
+          onMouseEnter={() => { setHoveredTile(0); setCarouselPaused(true); }}
+          onMouseLeave={() => { setHoveredTile(null); setCarouselPaused(false); }}>
           <div style={S.heroBg} aria-hidden="true">
-            <div style={{ ...S.heroImg, backgroundImage: `url(${img[0]})` }} />
+            {destination.images.slice(0, 5).map((src, i) => (
+              <div key={src} style={{
+                ...S.heroImg,
+                backgroundImage: `url(${src})`,
+                opacity: i === carouselIdx ? 1 : 0,
+                transition: 'opacity 1.2s ease',
+              }} />
+            ))}
             <div style={S.heroVeil} />
           </div>
           <div style={S.heroInner}>
@@ -156,6 +702,25 @@ export default function Moodboard({ destination, isWished, onToggleWish, onClose
               <div style={S.heroTitle}>{destination.name}</div>
               <div style={S.heroSub}>{destination.tagline}</div>
             </div>
+          </div>
+          {/* Carousel arrows — bottom right, minimal style */}
+          <div style={S.carouselArrows}>
+            <button
+              className="mb-carousel-btn"
+              style={{ ...S.carouselBtn, color: carouselHover === 'prev' ? '#f4ecd4' : 'rgba(244,236,212,0.45)' }}
+              onMouseEnter={() => setCarouselHover('prev')}
+              onMouseLeave={() => setCarouselHover(null)}
+              onClick={() => setCarouselIdx(i => (i + imgCount - 1) % imgCount)}
+              aria-label="Previous image"
+            >‹</button>
+            <button
+              className="mb-carousel-btn"
+              style={{ ...S.carouselBtn, color: carouselHover === 'next' ? '#f4ecd4' : 'rgba(244,236,212,0.45)' }}
+              onMouseEnter={() => setCarouselHover('next')}
+              onMouseLeave={() => setCarouselHover(null)}
+              onClick={() => setCarouselIdx(i => (i + 1) % imgCount)}
+              aria-label="Next image"
+            >›</button>
           </div>
         </div>
 
@@ -192,25 +757,10 @@ export default function Moodboard({ destination, isWished, onToggleWish, onClose
           <div style={S.tileBody}>{weatherSub}</div>
         </div>
 
-        {/* TILE 4 — Region globe: SVG sphere + lat/lon */}
+        {/* TILE 4 — Location widget: 5-card paginated info panel */}
         <div style={{ ...S.cell, ...S.tileGlobe, ...tile(3, hoveredTile === 3) }}
           onMouseEnter={() => setHoveredTile(3)} onMouseLeave={() => setHoveredTile(null)}>
-          <RegionGlobe lat={destination.lat} lon={destination.lon} />
-          <div style={S.globeFoot}>
-            <div style={{ ...S.tileTitle, display: 'flex', gap: 8, alignItems: 'center' }}>
-              <svg width="13" height="13" viewBox="0 0 14 14"
-                fill="none" stroke="currentColor" strokeWidth="1.3">
-                <circle cx="7" cy="7" r="6" />
-                <path d="M1 7 H13 M7 1 C 4 4, 4 10, 7 13 M7 1 C 10 4, 10 10, 7 13" />
-              </svg>
-              <span>{destination.region}</span>
-            </div>
-            <div style={S.tileBody}>
-              {Math.abs(destination.lat).toFixed(1)}°{destination.lat >= 0 ? 'N' : 'S'}
-              {' · '}
-              {Math.abs(destination.lon).toFixed(1)}°{destination.lon >= 0 ? 'E' : 'W'}
-            </div>
-          </div>
+          <Bin4LocationWidget d={destination} cur={bin4Cur} setCur={setBin4Cur} />
         </div>
 
         {/* TILE 5 — Itinerary: 5 experiences in 2-col grid */}
@@ -336,9 +886,9 @@ const S: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   brandText: { color: '#ffd100', fontWeight: 700 },
-  topSep: { color: 'rgba(244,236,212,0.3)' },
-  topMeta: { color: 'rgba(244,236,212,0.7)' },
-  topRight: { display: 'flex', gap: 8, alignItems: 'center' },
+  topSep:    { color: 'rgba(244,236,212,0.3)' },
+  topMeta:   { color: 'rgba(244,236,212,0.7)' },
+  topRight:  { display: 'flex', gap: 8, alignItems: 'center' },
   wishBtn: {
     display: 'flex',
     alignItems: 'center',
@@ -378,7 +928,7 @@ const S: Record<string, React.CSSProperties> = {
 
   cell: cellBase,
 
-  // Tile 1 — Hero
+  // Tile 1 — Hero carousel
   tileHero: {
     gridColumn: '1 / span 4',
     gridRow: '1 / span 4',
@@ -395,11 +945,12 @@ const S: Record<string, React.CSSProperties> = {
   heroVeil: {
     position: 'absolute',
     inset: 0,
+    zIndex: 1,
     background: 'linear-gradient(180deg, rgba(7,15,31,0.55) 0%, rgba(7,15,31,0.78) 100%)',
   },
   heroInner: {
     position: 'relative',
-    zIndex: 1,
+    zIndex: 2,
     height: '100%',
     padding: '30px 32px',
     display: 'flex',
@@ -414,7 +965,7 @@ const S: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'baseline',
   },
-  heroDisplayChar: { fontSize: 'clamp(140px, 13vw, 220px)' },
+  heroDisplayChar:   { fontSize: 'clamp(140px, 13vw, 220px)' },
   heroDisplayCharSm: {
     fontSize: 'clamp(80px, 7vw, 120px)',
     opacity: 0.85,
@@ -434,6 +985,25 @@ const S: Record<string, React.CSSProperties> = {
     color: 'rgba(244,236,212,0.78)',
     lineHeight: 1.45,
     maxWidth: 380,
+  },
+  // Carousel arrows — absolutely positioned bottom-right of Tile 1
+  carouselArrows: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+    zIndex: 3,
+    display: 'flex',
+    gap: 6,
+  },
+  carouselBtn: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: 22,
+    lineHeight: 1,
+    padding: '2px 5px',
+    transition: 'color 0.15s',
+    fontFamily: "'Inter', sans-serif",
   },
 
   // Tile 2 — Themes
@@ -469,7 +1039,7 @@ const S: Record<string, React.CSSProperties> = {
     textTransform: 'uppercase',
     marginBottom: 4,
   },
-  climateSvg: { width: '100%', height: 36, display: 'block' },
+  climateSvg:  { width: '100%', height: 36, display: 'block' },
   climateAxis: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -480,19 +1050,11 @@ const S: Record<string, React.CSSProperties> = {
     marginTop: 2,
   },
 
-  // Tile 4 — Globe
+  // Tile 4 — Location widget (replaces RegionGlobe)
   tileGlobe: {
     gridColumn: '9 / span 4',
     gridRow: '1 / span 4',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '30px 28px',
-  },
-  globeFoot: {
-    width: '100%',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 6,
+    padding: '20px 22px 16px',
   },
 
   // Shared tile typography
@@ -592,7 +1154,7 @@ const S: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     gap: 14,
   },
-  finaleRow: { display: 'flex', flexDirection: 'column', gap: 5 },
+  finaleRow:  { display: 'flex', flexDirection: 'column', gap: 5 },
   finaleLabel: {
     fontFamily: 'var(--font-mono)',
     fontSize: 9,
