@@ -222,6 +222,12 @@ function SeasonWheelCard({ d }: { d: Destination }) {
   const MONTH_NAMES = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
   const CX = 100, CY = 100, R_OUT = 62, R_IN = 38, R_TEMP = 82;
   const [hoveredMonth, setHoveredMonth] = useState<number | null>(null);
+  const SEASON_MAP: Record<number, string> = {
+    0: 'WINTER', 1: 'WINTER', 2: 'SPRING',
+    3: 'SPRING', 4: 'SPRING', 5: 'SUMMER',
+    6: 'SUMMER', 7: 'SUMMER', 8: 'AUTUMN',
+    9: 'AUTUMN', 10: 'AUTUMN', 11: 'WINTER',
+  };
 
   const peakMonths = d.peak_months ?? [];
   const temps = d.monthly_temps ?? [];
@@ -305,7 +311,11 @@ function SeasonWheelCard({ d }: { d: Destination }) {
           <circle cx={CX} cy={CY} r={R_OUT} fill="none" stroke="rgba(255,220,170,0.12)" strokeWidth={0.5} />
           <circle cx={CX} cy={CY} r={R_IN}  fill={T.bg} stroke="rgba(255,220,170,0.10)" strokeWidth={0.5} />
           <text x={CX} y={CY - 10} textAnchor="middle" fontFamily={T.fontMono} fontSize={6}
-            fill="rgba(244,236,212,0.30)" letterSpacing="0.1em">AVG</text>
+            fill={hoveredMonth !== null ? T.amber : 'rgba(244,236,212,0.30)'}
+            letterSpacing="0.1em"
+            style={{ transition: 'fill 0.2s' }}>
+            {hoveredMonth !== null ? SEASON_MAP[hoveredMonth] : 'AVG'}
+          </text>
           <text x={CX} y={CY + 5} textAnchor="middle" fontFamily={T.fontSerif} fontSize={18}
             fill="rgba(244,236,212,0.75)">{Math.round(temps.reduce((a: number, b: number) => a + b, 0) / temps.length)}</text>
           <text x={CX} y={CY + 17} textAnchor="middle" fontFamily={T.fontMono} fontSize={6}
