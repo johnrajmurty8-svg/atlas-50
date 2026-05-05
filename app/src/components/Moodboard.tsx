@@ -44,8 +44,12 @@ const CARD_NAMES = [
 // ─── Card 1: Globe ────────────────────────────────────────────
 function GlobeCard({ d }: { d: Destination }) {
   const [localTime, setLocalTime] = useState('—');
-  const rotRef1 = useRef<SVGGElement>(null);
-  const rotRef2 = useRef<SVGGElement>(null);
+  const planeRef  = useRef<SVGGElement>(null);
+  const planeRef2 = useRef<SVGGElement>(null);
+  const planeRef3 = useRef<SVGGElement>(null);
+  const planeRef4 = useRef<SVGGElement>(null);
+  const planeRef5 = useRef<SVGGElement>(null);
+  const planeRef6 = useRef<SVGGElement>(null);
 
   useEffect(() => {
     const fmt = () => {
@@ -65,14 +69,51 @@ function GlobeCard({ d }: { d: Destination }) {
   }, [d.timezone]);
 
   useEffect(() => {
-    const period = 421; // 2π × R(67) — full equatorial circumference in SVG px
-    let dx = 0;
+    const GCX = 93, GCY = 86;
+    // Orbit 1 — primary, -30° tilt (rx=82, ry=28)
+    const ORX1 = 82, ORY1 = 28, TILT1 = -30 * Math.PI / 180;
+    const cosTilt1 = Math.cos(TILT1), sinTilt1 = Math.sin(TILT1);
+    // Orbit 2 — secondary, +22° tilt (rx=82, ry=18)
+    const ORX2 = 82, ORY2 = 18, TILT2 = 22 * Math.PI / 180;
+    const cosTilt2 = Math.cos(TILT2), sinTilt2 = Math.sin(TILT2);
+    // Orbit 3 — horizontal equatorial (rx=82, ry=14), right-to-left
+    const ORX3 = 82, ORY3 = 14, cosTilt3 = 1, sinTilt3 = 0;
+    const speed = 0.0148;
+    let t = 0;
     let rafId: number;
+    // dir: 1 = CCW (left→right across front), -1 = CW (right→left across front)
+    const animPlane = (
+      ref: React.RefObject<SVGGElement>,
+      angle: number,
+      ORX: number, ORY: number,
+      cosTilt: number, sinTilt: number,
+      dir: 1 | -1 = 1
+    ) => {
+      const c = Math.cos(angle), s = Math.sin(angle);
+      const px = GCX + ORX * c * cosTilt - ORY * s * sinTilt;
+      const py = GCY + ORX * c * sinTilt + ORY * s * cosTilt;
+      const vx = dir * (-ORX * s * cosTilt - ORY * c * sinTilt);
+      const vy = dir * (-ORX * s * sinTilt + ORY * c * cosTilt);
+      const heading = Math.atan2(vy, vx) * 180 / Math.PI + 90;
+      const opacity = Math.max(0, Math.min(1, (-s + 0.15) / 0.30));
+      if (ref.current) {
+        ref.current.setAttribute('transform', `translate(${px.toFixed(2)},${py.toFixed(2)}) rotate(${heading.toFixed(1)})`);
+        ref.current.setAttribute('opacity', opacity.toFixed(3));
+      }
+    };
     const tick = () => {
-      dx -= 1.0;
-      if (dx <= -period) dx += period;
-      rotRef1.current?.setAttribute('transform', `translate(${dx.toFixed(1)},0)`);
-      rotRef2.current?.setAttribute('transform', `translate(${(dx + period).toFixed(1)},0)`);
+      t = (t + speed) % (Math.PI * 2);
+      // Orbit 1 — two planes at opposite phases; always one visible
+      animPlane(planeRef,  t,           ORX1, ORY1, cosTilt1, sinTilt1);
+      animPlane(planeRef3, t + Math.PI, ORX1, ORY1, cosTilt1, sinTilt1);
+      // Orbit 2 — two planes at opposite phases; always one visible
+      const t2offset = Math.PI * 0.6;
+      animPlane(planeRef2, t + t2offset,           ORX2, ORY2, cosTilt2, sinTilt2);
+      animPlane(planeRef4, t + t2offset + Math.PI, ORX2, ORY2, cosTilt2, sinTilt2);
+      // Orbit 3 — horizontal, right-to-left (dir = -1)
+      const t3offset = Math.PI * 1.2;
+      animPlane(planeRef5, t + t3offset,           ORX3, ORY3, cosTilt3, sinTilt3, 1);
+      animPlane(planeRef6, t + t3offset + Math.PI, ORX3, ORY3, cosTilt3, sinTilt3, 1);
       rafId = requestAnimationFrame(tick);
     };
     rafId = requestAnimationFrame(tick);
@@ -102,37 +143,58 @@ function GlobeCard({ d }: { d: Destination }) {
               <circle cx={CX} cy={CY} r={R} />
             </clipPath>
           </defs>
-          {/* Atmosphere rings */}
-          <circle cx={CX} cy={CY} r={R + 3.5}  fill="none" stroke={T.blueAtm1} strokeWidth={3.5} />
-          <circle cx={CX} cy={CY} r={R + 7.5}  fill="none" stroke={T.blueAtm2} strokeWidth={3.5} />
-          <circle cx={CX} cy={CY} r={R + 12}   fill="none" stroke={T.blueAtm3} strokeWidth={5} />
+          {/* Atmosphere rings — slow pulse */}
+          <g style={{ animation: 'gc-halo-pulse 4s ease-in-out infinite' }}>
+            <circle cx={CX} cy={CY} r={R + 3.5}  fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth={3} />
+            <circle cx={CX} cy={CY} r={R + 7.5}  fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth={3} />
+            <circle cx={CX} cy={CY} r={R + 12}   fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth={4.5} />
+          </g>
           {/* Globe base */}
           <circle cx={CX} cy={CY} r={R} fill={T.bgDeep} />
           <g clipPath="url(#gc)">
-            {/* Static latitude lines — these are geographic constants, don't rotate */}
+            <ellipse cx={CX} cy={CY} rx={33.5} ry={R} fill="none" stroke="rgba(255,220,170,0.05)" strokeWidth={0.5} />
+            <ellipse cx={CX} cy={CY} rx={58}   ry={R} fill="none" stroke="rgba(255,220,170,0.04)" strokeWidth={0.5} />
+            <line x1={CX} y1={CY - R} x2={CX} y2={CY + R} stroke="rgba(255,220,170,0.05)" strokeWidth={0.5} />
             <path d="M26,67 C59,108 127,108 160,67" fill="none" stroke="rgba(255,220,170,0.20)" strokeWidth={0.6} strokeDasharray="2.5,2.5" />
             <path d="M26,86 C59,132 127,132 160,86" fill="none" stroke="rgba(255,220,170,0.12)" strokeWidth={0.6} strokeDasharray="2.5,2.5" />
-            {/* Rotating group 1 — longitude lines + country silhouette */}
-            <g ref={rotRef1}>
-              <ellipse cx={CX} cy={CY} rx={33.5} ry={R} fill="none" stroke="rgba(255,220,170,0.05)" strokeWidth={0.5} />
-              <ellipse cx={CX} cy={CY} rx={58}   ry={R} fill="none" stroke="rgba(255,220,170,0.04)" strokeWidth={0.5} />
-              <line x1={CX} y1={CY - R} x2={CX} y2={CY + R} stroke="rgba(255,220,170,0.05)" strokeWidth={0.5} />
-              {d.globe_path && <path d={d.globe_path} fill="rgba(255,209,0,0.68)" stroke="rgba(255,209,0,0.20)" strokeWidth={0.5} />}
-            </g>
-            {/* Rotating group 2 — duplicate offset by one full period for seamless loop */}
-            <g ref={rotRef2} transform="translate(421,0)">
-              <ellipse cx={CX} cy={CY} rx={33.5} ry={R} fill="none" stroke="rgba(255,220,170,0.05)" strokeWidth={0.5} />
-              <ellipse cx={CX} cy={CY} rx={58}   ry={R} fill="none" stroke="rgba(255,220,170,0.04)" strokeWidth={0.5} />
-              <line x1={CX} y1={CY - R} x2={CX} y2={CY + R} stroke="rgba(255,220,170,0.05)" strokeWidth={0.5} />
-              {d.globe_path && <path d={d.globe_path} fill="rgba(255,209,0,0.68)" stroke="rgba(255,209,0,0.20)" strokeWidth={0.5} />}
-            </g>
+            {d.globe_path && <path d={d.globe_path} fill="rgba(255,209,0,0.68)" stroke="rgba(255,209,0,0.20)" strokeWidth={0.5} />}
+            <text x={120} y={70}  fontFamily={T.fontMono} fontSize={6} fill="rgba(255,220,170,0.30)" letterSpacing="0.05em">TROPIC OF CANCER</text>
+            <text x={120} y={89}  fontFamily={T.fontMono} fontSize={6} fill="rgba(255,220,170,0.20)" letterSpacing="0.05em">EQUATOR</text>
           </g>
           {/* Globe edge */}
           <circle cx={CX} cy={CY} r={R} fill="none" stroke="rgba(255,220,170,0.22)" strokeWidth={0.5} />
-          {/* Destination pin with two pulsing halos */}
+          {/* Destination pin */}
           <circle cx={CX} cy={84} r={3.5} fill={T.amber} />
           <circle cx={CX} cy={84} r={7.5} fill="none" stroke="rgba(255,209,0,0.48)" strokeWidth={0.9} />
           <circle cx={CX} cy={84} r={12}  fill="none" stroke="rgba(255,209,0,0.18)" strokeWidth={0.6} />
+          {/* Orbit paths — three dotted routes */}
+          <ellipse cx={CX} cy={CY} rx={82} ry={28}
+            transform={`rotate(-30,${CX},${CY})`}
+            fill="none" stroke="rgba(255,209,0,0.32)" strokeWidth={0.7} strokeDasharray="3,2.5" />
+          <ellipse cx={CX} cy={CY} rx={82} ry={18}
+            transform={`rotate(22,${CX},${CY})`}
+            fill="none" stroke="rgba(255,209,0,0.32)" strokeWidth={0.7} strokeDasharray="3,2.5" />
+          <ellipse cx={CX} cy={CY} rx={82} ry={14}
+            fill="none" stroke="rgba(255,209,0,0.32)" strokeWidth={0.7} strokeDasharray="3,2.5" />
+          {/* Planes — 2 per orbit at opposite phases, always one visible per orbit */}
+          <g ref={planeRef}>
+            <path d="M0,-6.25 L1.5,-2.5 L5.6,0.6 L1.9,0 L1.5,4.4 L0,3.1 L-1.5,4.4 L-1.9,0 L-5.6,0.6 L-1.5,-2.5 Z" fill={T.amber} />
+          </g>
+          <g ref={planeRef3}>
+            <path d="M0,-6.25 L1.5,-2.5 L5.6,0.6 L1.9,0 L1.5,4.4 L0,3.1 L-1.5,4.4 L-1.9,0 L-5.6,0.6 L-1.5,-2.5 Z" fill={T.amber} />
+          </g>
+          <g ref={planeRef2}>
+            <path d="M0,-6.25 L1.5,-2.5 L5.6,0.6 L1.9,0 L1.5,4.4 L0,3.1 L-1.5,4.4 L-1.9,0 L-5.6,0.6 L-1.5,-2.5 Z" fill={T.amber} />
+          </g>
+          <g ref={planeRef4}>
+            <path d="M0,-6.25 L1.5,-2.5 L5.6,0.6 L1.9,0 L1.5,4.4 L0,3.1 L-1.5,4.4 L-1.9,0 L-5.6,0.6 L-1.5,-2.5 Z" fill={T.amber} />
+          </g>
+          <g ref={planeRef5}>
+            <path d="M0,-6.25 L1.5,-2.5 L5.6,0.6 L1.9,0 L1.5,4.4 L0,3.1 L-1.5,4.4 L-1.9,0 L-5.6,0.6 L-1.5,-2.5 Z" fill={T.amber} />
+          </g>
+          <g ref={planeRef6}>
+            <path d="M0,-6.25 L1.5,-2.5 L5.6,0.6 L1.9,0 L1.5,4.4 L0,3.1 L-1.5,4.4 L-1.9,0 L-5.6,0.6 L-1.5,-2.5 Z" fill={T.amber} />
+          </g>
         </svg>
       </div>
 
@@ -159,6 +221,7 @@ function SeasonWheelCard({ d }: { d: Destination }) {
   const MONTHS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
   const MONTH_NAMES = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
   const CX = 100, CY = 100, R_OUT = 62, R_IN = 38, R_TEMP = 82;
+  const [hoveredMonth, setHoveredMonth] = useState<number | null>(null);
 
   const peakMonths = d.peak_months ?? [];
   const temps = d.monthly_temps ?? [];
@@ -209,27 +272,44 @@ function SeasonWheelCard({ d }: { d: Destination }) {
       </div>
       <div style={{ flex: 1, display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
         <svg width={350} height={350} viewBox="0 0 200 200" style={{ marginTop: -19 }}>
-          {segments.map(({ i, isPeak, pathD, mx, my, tx, ty, m, temp, warmRatio }) => (
-            <g key={i}>
-              <path d={pathD} fill={isPeak ? T.amberMid : T.blueSeason} stroke={T.bg} strokeWidth={1.5} />
-              <text x={mx} y={my + 3} textAnchor="middle" fontFamily={T.fontMono} fontSize={7}
-                fill={isPeak ? 'rgba(7,15,31,0.9)' : 'rgba(160,200,255,0.7)'}>
-                {m}
-              </text>
-              <text x={tx} y={ty + 3} textAnchor="middle" fontFamily={T.fontMono} fontSize={9}
-                fill={isPeak
-                  ? `rgba(255,209,0,${(0.5 + warmRatio * 0.5).toFixed(2)})`
-                  : `rgba(140,195,255,${(0.38 + (1 - warmRatio) * 0.3).toFixed(2)})`}>
-                {temp}°
-              </text>
-            </g>
-          ))}
+          {segments.map(({ i, isPeak, pathD, mx, my, tx, ty, m, temp, warmRatio }) => {
+            const isHov = hoveredMonth === i;
+            const dim   = hoveredMonth !== null && !isHov;
+            return (
+              <g key={i}
+                onMouseEnter={() => setHoveredMonth(i)}
+                onMouseLeave={() => setHoveredMonth(null)}
+              >
+                <path d={pathD} fill={isPeak ? T.amberMid : T.blueSeason} stroke={T.bg} strokeWidth={1.5}
+                  style={{
+                    opacity: dim ? 0.45 : 1,
+                    filter: isHov ? 'brightness(1.4)' : 'none',
+                    transform: isHov ? 'scale(1.20)' : 'scale(1)',
+                    transformBox: 'fill-box',
+                    transformOrigin: 'center',
+                    transition: 'opacity 0.2s, filter 0.2s, transform 0.2s ease',
+                  }} />
+                <text x={mx} y={my + 3} textAnchor="middle" fontFamily={T.fontMono} fontSize={7}
+                  fill={isPeak ? 'rgba(7,15,31,0.9)' : 'rgba(160,200,255,0.7)'}>
+                  {m}
+                </text>
+                <text x={tx} y={ty + 3} textAnchor="middle" fontFamily={T.fontMono} fontSize={9}
+                  fill={isPeak
+                    ? `rgba(255,209,0,${(0.5 + warmRatio * 0.5).toFixed(2)})`
+                    : `rgba(140,195,255,${(0.38 + (1 - warmRatio) * 0.3).toFixed(2)})`}>
+                  {temp}°
+                </text>
+              </g>
+            );
+          })}
           <circle cx={CX} cy={CY} r={R_OUT} fill="none" stroke="rgba(255,220,170,0.12)" strokeWidth={0.5} />
           <circle cx={CX} cy={CY} r={R_IN}  fill={T.bg} stroke="rgba(255,220,170,0.10)" strokeWidth={0.5} />
-          <text x={CX} y={CY - 3} textAnchor="middle" fontFamily={T.fontMono} fontSize={7}
-            fill="rgba(244,236,212,0.20)" letterSpacing="0.1em">AVG</text>
-          <text x={CX} y={CY + 9} textAnchor="middle" fontFamily={T.fontMono} fontSize={7}
-            fill="rgba(244,236,212,0.20)" letterSpacing="0.1em">°C</text>
+          <text x={CX} y={CY - 10} textAnchor="middle" fontFamily={T.fontMono} fontSize={6}
+            fill="rgba(244,236,212,0.30)" letterSpacing="0.1em">AVG</text>
+          <text x={CX} y={CY + 5} textAnchor="middle" fontFamily={T.fontSerif} fontSize={18}
+            fill="rgba(244,236,212,0.75)">{Math.round(temps.reduce((a: number, b: number) => a + b, 0) / temps.length)}</text>
+          <text x={CX} y={CY + 17} textAnchor="middle" fontFamily={T.fontMono} fontSize={6}
+            fill="rgba(244,236,212,0.30)" letterSpacing="0.1em">°C</text>
         </svg>
       </div>
 
@@ -258,6 +338,7 @@ function VibeRadarCard({ d }: { d: Destination }) {
     { key: 'adventure' as const, label: 'ADVENTURE', offsetX: -78, offsetY: -27 },
   ];
   const N = 5, R = 60, CX = 120, CY = 110;
+  const [hoveredAxis, setHoveredAxis] = useState<string | null>(null);
 
   if (!d.vibe_scores) {
     return (
@@ -318,17 +399,42 @@ function VibeRadarCard({ d }: { d: Destination }) {
                   stroke="rgba(255,255,255,0.15)" strokeWidth={0.5} />
               );
             })}
-            <polygon points={filledPoints} fill="rgba(255,209,0,0.10)" stroke={T.amber} strokeWidth={1} />
-            {dots.map((dot, i) => (
-              <circle key={i} cx={dot.cx} cy={dot.cy} r={2.5} fill={T.amber} />
-            ))}
-            {AXES.map(({ label, offsetX, offsetY, key }) => (
-              <text key={key} x={offsetX} y={offsetY}
-                textAnchor={offsetX < 0 ? 'end' : offsetX > 0 ? 'start' : 'middle'}
-                fontFamily={T.fontMono} fontSize={8} fill="rgba(240,232,208,0.85)">
-                {label}
-              </text>
-            ))}
+            <polygon points={filledPoints}
+              fill={hoveredAxis ? 'rgba(255,209,0,0.16)' : 'rgba(255,209,0,0.10)'}
+              stroke={T.amber} strokeWidth={1}
+              style={{ transition: 'fill 0.2s' }} />
+            {AXES.map(({ label, offsetX, offsetY, key }, i) => {
+              const isHov = hoveredAxis === key;
+              return (
+                <g key={key}
+                  onMouseEnter={() => setHoveredAxis(key)}
+                  onMouseLeave={() => setHoveredAxis(null)}
+                  style={{ cursor: 'default' }}
+                >
+                  <circle cx={dots[i].cx} cy={dots[i].cy} r={2.5} fill={T.amber}
+                    style={{
+                      transform: isHov ? 'scale(1.9)' : 'scale(1)',
+                      transformBox: 'fill-box',
+                      transformOrigin: 'center',
+                      transition: 'transform 0.2s ease',
+                    }} />
+                  <text x={offsetX} y={offsetY}
+                    textAnchor={offsetX < 0 ? 'end' : offsetX > 0 ? 'start' : 'middle'}
+                    fontFamily={T.fontMono} fontSize={8}
+                    fill={isHov ? 'rgba(255,209,0,0.95)' : 'rgba(240,232,208,0.85)'}
+                    style={{ transition: 'fill 0.2s' }}>
+                    {label}
+                  </text>
+                  <text x={offsetX} y={offsetY + 12}
+                    textAnchor={offsetX < 0 ? 'end' : offsetX > 0 ? 'start' : 'middle'}
+                    fontFamily={T.fontMono} fontSize={9}
+                    fill={T.amber}
+                    style={{ opacity: isHov ? 1 : 0, transition: 'opacity 0.2s' }}>
+                    {(d.vibe_scores![key] * 5).toFixed(1)} / 5
+                  </text>
+                </g>
+              );
+            })}
           </g>
         </svg>
       </div>
@@ -339,6 +445,7 @@ function VibeRadarCard({ d }: { d: Destination }) {
 // ─── Card 4: Crowd Calendar ───────────────────────────────────
 function CrowdCalendarCard({ d }: { d: Destination }) {
   const BAR_W = 22, MAX_H = 179, GAP = 5, START_X = 6;
+  const [hoveredBar, setHoveredBar] = useState<number | null>(null);
   const SVG_W = 346, SVG_H = 240;
 
   if (!d.crowd_index || d.crowd_index.length < 12) {
@@ -368,12 +475,23 @@ function CrowdCalendarCard({ d }: { d: Destination }) {
             const barH  = Math.round((v / 10) * MAX_H);
             const x     = START_X + i * (BAR_W + GAP);
             const alpha = 0.10 + (v / 10) * 0.72;
+            const isHov = hoveredBar === i;
+            const dim   = hoveredBar !== null && !isHov;
             return (
               <rect key={i}
                 x={x} y={MAX_H - barH + 10}
                 width={BAR_W} height={barH}
-                fill={`rgba(255,209,0,${alpha.toFixed(2)})`}
-                stroke="rgba(255,220,170,0.08)" strokeWidth={0.5}
+                fill={`rgba(255,209,0,${(isHov ? Math.min(1, alpha * 1.6) : dim ? alpha * 0.35 : alpha).toFixed(2)})`}
+                stroke={isHov ? 'rgba(255,209,0,0.55)' : 'rgba(255,220,170,0.08)'} strokeWidth={0.5}
+                style={{
+                  transition: 'fill 0.15s, stroke 0.15s, transform 0.15s ease',
+                  cursor: 'default',
+                  transform: isHov ? 'scaleY(1.07)' : 'scaleY(1)',
+                  transformBox: 'fill-box',
+                  transformOrigin: 'bottom',
+                }}
+                onMouseEnter={() => setHoveredBar(i)}
+                onMouseLeave={() => setHoveredBar(null)}
               />
             );
           })}
@@ -398,6 +516,7 @@ function CrowdCalendarCard({ d }: { d: Destination }) {
 // ─── Card 5: Cost Breakdown ───────────────────────────────────
 function CostBreakdownCard({ d }: { d: Destination }) {
   const CX = 85, CY = 85, R_OUT = 75, R_IN = 45;
+  const [hoveredSeg, setHoveredSeg] = useState<string | null>(null);
 
   const SEGMENTS = [
     { key: 'accommodation' as const, label: 'ACCOMMODATION', color: T.amberHi },
@@ -454,7 +573,18 @@ function CostBreakdownCard({ d }: { d: Destination }) {
         <div style={{ position: 'relative', flexShrink: 0 }}>
           <svg width={171} height={171} viewBox="0 0 171 171">
             {arcs.map(({ key, pathD, color }) => (
-              <path key={key} d={pathD} fill={color} stroke={T.bg} strokeWidth={1.5} />
+              <path key={key} d={pathD} fill={color} stroke={T.bg} strokeWidth={1.5}
+                style={{
+                  transform: hoveredSeg === key ? 'scale(1.07)' : 'scale(1)',
+                  transformBox: 'fill-box',
+                  transformOrigin: 'center',
+                  opacity: hoveredSeg === null || hoveredSeg === key ? 1 : 0.45,
+                  transition: 'transform 0.2s ease, opacity 0.2s',
+                  cursor: 'default',
+                }}
+                onMouseEnter={() => setHoveredSeg(key)}
+                onMouseLeave={() => setHoveredSeg(null)}
+              />
             ))}
           </svg>
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
@@ -467,7 +597,16 @@ function CostBreakdownCard({ d }: { d: Destination }) {
         {/* Legend */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           {arcs.map(({ key, label, color, pct }) => (
-            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 9 }}>
+            <div key={key}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10, marginBottom: 9,
+                opacity: hoveredSeg === null || hoveredSeg === key ? 1 : 0.4,
+                transition: 'opacity 0.2s',
+                cursor: 'default',
+              }}
+              onMouseEnter={() => setHoveredSeg(key)}
+              onMouseLeave={() => setHoveredSeg(null)}
+            >
               <div style={{ width: 8, height: 8, background: color, flexShrink: 0 }} />
               <span style={{ fontFamily: T.fontMono, fontSize: 13, color: 'rgba(240,232,208,0.90)', letterSpacing: '0.05em', flex: 1 }}>{label}</span>
               <span style={{ fontFamily: T.fontMono, fontSize: 13, color: '#f0e8d0' }}>{Math.round(pct * 100)}%</span>
@@ -590,6 +729,7 @@ export default function Moodboard({ destination, isWished, onToggleWish, onClose
       s.textContent = [
         '@keyframes mb-fade { from { opacity:0 } to { opacity:1 } }',
         '.mb-carousel-btn:hover { color: #f4ecd4 !important; }',
+        '@keyframes gc-halo-pulse { 0%,100% { opacity:0.08 } 50% { opacity:1 } }',
       ].join('\n');
       document.head.appendChild(s);
     }
