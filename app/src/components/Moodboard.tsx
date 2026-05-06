@@ -636,6 +636,250 @@ function CostBreakdownCard({ d }: { d: Destination }) {
   );
 }
 
+// ─── Bin 2: 3-card curated lists widget ──────────────────────
+const CURATED_CARDS = [
+  { key: 'culture' as const, label: 'CULTURE · TOP 5' },
+  { key: 'nature'  as const, label: 'NATURE · TOP 5'  },
+  { key: 'food'    as const, label: 'FOOD · TOP 5'    },
+];
+
+function Bin2CuratedListsWidget({ d, cur, setCur }: { d: Destination; cur: number; setCur: (n: number) => void }) {
+  const lists = d.curated_lists;
+  const total = 3;
+  const prev = () => { setCur((cur + total - 1) % total); setHoveredItem(null); };
+  const next = () => { setCur((cur + 1) % total); setHoveredItem(null); };
+  const [hoveredItem, setHoveredItem] = useState<number | null>(null);
+
+  const chevron: React.CSSProperties = {
+    background: 'none', border: 'none',
+    color: 'rgba(244,236,212,0.45)', fontSize: 18,
+    cursor: 'pointer', padding: '0 3px',
+    fontFamily: "'Inter', sans-serif",
+    transition: 'color 0.15s',
+    lineHeight: 1,
+  };
+
+  if (!lists) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div style={{ fontFamily: T.fontMono, fontSize: 9, letterSpacing: '0.25em', color: T.amber, textTransform: 'uppercase', marginBottom: 10 }}>
+          CURATED LISTS
+        </div>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.creamFaint, fontFamily: T.fontMono, fontSize: 13 }}>—</div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ position: 'relative', flex: 1, overflow: 'hidden' }}>
+        {CURATED_CARDS.map(({ key, label }, i) => (
+          <div key={key} style={{
+            position: 'absolute', inset: 0,
+            display: 'flex', flexDirection: 'column',
+            opacity: i === cur ? 1 : 0,
+            pointerEvents: i === cur ? 'auto' : 'none',
+            transition: 'opacity 0.35s ease',
+          }}>
+            <div style={{ fontFamily: T.fontMono, fontSize: 9, letterSpacing: '0.25em', color: T.amber, textTransform: 'uppercase', marginBottom: 10, flexShrink: 0 }}>
+              {label}
+            </div>
+            <div className="bin2-scroll" style={{ display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', flex: 1 }}>
+              {lists[key].map((entry, j) => {
+                const isHov = hoveredItem === j;
+                return (
+                  <div key={j}
+                    onMouseEnter={() => setHoveredItem(j)}
+                    onMouseLeave={() => setHoveredItem(null)}
+                    style={{
+                      position: 'relative', overflow: 'hidden',
+                      flexShrink: 0, minHeight: 80,
+                      borderRadius: 10,
+                      border: '1px solid rgba(255,220,170,0.12)',
+                      borderLeft: '5px solid rgba(255,209,0,0.80)',
+                      transform: isHov ? 'scale(1.04)' : 'scale(1)',
+                      transition: 'transform 0.18s cubic-bezier(.2,.8,.2,1)',
+                      cursor: 'default',
+                    }}>
+                    {/* Background image */}
+                    {entry.image && (
+                      <div style={{
+                        position: 'absolute', inset: 0,
+                        backgroundImage: `url(${entry.image})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        filter: 'saturate(0.80) contrast(1.05)',
+                      }} />
+                    )}
+                    {/* Dark veil */}
+                    <div style={{
+                      position: 'absolute', inset: 0,
+                      background: entry.image
+                        ? 'linear-gradient(to right, rgba(7,15,31,0.90) 0%, rgba(7,15,31,0.70) 55%, rgba(7,15,31,0.40) 100%)'
+                        : 'rgba(255,220,170,0.04)',
+                    }} />
+                    {/* Text */}
+                    <div style={{
+                      position: 'relative', zIndex: 1,
+                      display: 'flex', alignItems: 'flex-start', gap: 12,
+                      padding: '12px 14px',
+                    }}>
+                      <span style={{ fontFamily: T.fontMono, fontSize: 18, fontWeight: 700, color: T.amber, minWidth: 20, flexShrink: 0, paddingTop: 2 }}>{j + 1}</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        <span style={{ fontFamily: T.fontSerif, fontSize: 21, color: '#ffffff', lineHeight: 1.15 }}>{entry.location}</span>
+                        <span style={{ fontFamily: T.fontSans, fontSize: 18, color: 'rgba(244,236,212,0.75)', lineHeight: 1.3 }}>{entry.tagline}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 7, paddingTop: 8, flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 5, marginRight: 2 }}>
+          {Array.from({ length: total }, (_, i) => (
+            <div key={i} onClick={() => setCur(i)} style={{
+              width: 4, height: 4,
+              background: i === cur ? T.amber : 'rgba(255,220,170,0.20)',
+              cursor: 'pointer',
+              transition: 'background 0.3s',
+            }} />
+          ))}
+        </div>
+        <button style={chevron} onClick={prev} aria-label="Previous list">‹</button>
+        <button style={chevron} onClick={next} aria-label="Next list">›</button>
+      </div>
+    </div>
+  );
+}
+
+// Splits "text **highlight** more text" into plain + highlighted spans
+function renderWithHighlights(text: string, animate = false) {
+  const parts = text.split(/\*\*(.*?)\*\*/g);
+  let hlIdx = 0;
+  return parts.map((part, i) => {
+    if (i % 2 !== 1) return part;
+    if (animate) {
+      const delay = `${hlIdx++ * 0.35}s`;
+      return (
+        <span key={i} className="bin3-highlight" style={{ position: 'relative', display: 'inline-block', verticalAlign: 'baseline', borderRadius: 4, animationDelay: delay }}>
+          {/* white text — always visible before/during sweep */}
+          <span style={{ padding: '1px 4px', color: 'rgba(255,255,255,0.92)' }}>{part}</span>
+          {/* black text — clip-path revealed left-to-right in sync with yellow sweep */}
+          <span className="bin3-highlight-text" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, padding: '1px 4px', color: '#050912', whiteSpace: 'nowrap', animationDelay: delay }}>{part}</span>
+        </span>
+      );
+    }
+    return <span key={i} style={{ background: '#ffd100', color: '#050912', padding: '1px 4px', borderRadius: 4 }}>{part}</span>;
+  });
+}
+
+// ─── Bin 3: fun facts — manual scroll animation ───────────────
+function Bin3FunFactsWidget({ d }: { d: Destination }) {
+  const facts = d.fun_facts && d.fun_facts.length > 0 ? d.fun_facts : null;
+  const total = facts ? facts.length : 0;
+  const [cur, setCur]                       = useState(0);
+  const [animKey, setAnimKey]               = useState(0);
+  const [displayedCount, setDisplayedCount] = useState(0);
+  const [navHov, setNavHov]                 = useState<'prev' | 'next' | null>(null);
+
+  const navigate = (nextIdx: number) => {
+    setDisplayedCount(0);
+    setAnimKey(k => k + 1);
+    setCur(nextIdx);
+  };
+
+  const prev = () => navigate((cur + total - 1) % total);
+  const next = () => navigate((cur + 1) % total);
+
+  const inkBtn: React.CSSProperties = {
+    background: 'none', border: 'none',
+    color: 'rgba(255,255,255,0.45)', fontSize: 18,
+    cursor: 'pointer', padding: '0 3px',
+    fontFamily: "'Inter', sans-serif", lineHeight: 1,
+  };
+
+  // Typewriter effect — 500ms pause then types at 35ms/char, resets on every navigation
+  useEffect(() => {
+    if (!facts) return;
+    setDisplayedCount(0);
+    const text = facts[cur];
+    let i = 0;
+    let intervalId: ReturnType<typeof setInterval>;
+    const timeoutId = setTimeout(() => {
+      intervalId = setInterval(() => {
+        i += 1;
+        setDisplayedCount(i);
+        if (i >= text.length) clearInterval(intervalId);
+      }, 44);
+    }, 500);
+    return () => {
+      clearTimeout(timeoutId);
+      clearInterval(intervalId);
+    };
+  }, [animKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!facts) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'center', alignItems: 'center' }}>
+        <div style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 15, color: T.cream, textAlign: 'center', lineHeight: 1.6 }}>
+          More dispatches coming soon.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ position: 'relative', height: '100%' }}>
+      {/* Paper fills the full tile — reads like the top of a page */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: 'transparent',
+        backgroundImage: [
+          'repeating-linear-gradient(transparent, transparent 29px, rgba(255,255,255,0.10) 29px, rgba(255,255,255,0.10) 30px)',
+          'linear-gradient(to right, transparent 32px, rgba(255,255,255,0.14) 32px, rgba(255,255,255,0.14) 33px, transparent 33px)',
+        ].join(', '),
+        padding: '8px 16px 14px 42px',
+        overflow: 'hidden',
+      }}>
+        {/* header occupies exactly one 30px rule slot so text lines up from the second rule onward */}
+        <div style={{ fontFamily: T.fontMono, fontSize: 10, letterSpacing: '0.22em', color: T.amber, textTransform: 'uppercase', height: 30, display: 'flex', alignItems: 'center', marginBottom: 0 }}>
+          — Filed from {d.name} —
+        </div>
+        <div style={{
+          fontFamily: 'var(--font-handwritten)', fontSize: 18,
+          color: 'rgba(255,255,255,0.92)', lineHeight: '30px',
+        }}>
+          {displayedCount < facts[cur].length
+            ? facts[cur].slice(0, displayedCount).replace(/\*\*/g, '')
+            : renderWithHighlights(facts[cur], true)
+          }
+          {displayedCount < facts[cur].length && (
+            <span style={{ fontFamily: T.fontMono, fontSize: 12, color: 'rgba(255,255,255,0.50)', animation: 'bin3-cursor-blink 0.5s steps(1) infinite' }}>|</span>
+          )}
+        </div>
+      </div>
+
+      {/* Nav */}
+      <div style={{ position: 'absolute', bottom: 8, right: 10, zIndex: 2, display: 'flex', alignItems: 'center', gap: 7 }}>
+        <button
+          style={{ ...inkBtn, color: navHov === 'prev' ? 'rgba(255,255,255,0.90)' : 'rgba(255,255,255,0.45)', transition: 'color 0.15s' }}
+          onMouseEnter={() => setNavHov('prev')} onMouseLeave={() => setNavHov(null)}
+          onClick={prev} aria-label="Previous fact"
+        >‹</button>
+        <button
+          style={{ ...inkBtn, color: navHov === 'next' ? 'rgba(255,255,255,0.90)' : 'rgba(255,255,255,0.45)', transition: 'color 0.15s' }}
+          onMouseEnter={() => setNavHov('next')} onMouseLeave={() => setNavHov(null)}
+          onClick={next} aria-label="Next fact"
+        >›</button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Bin 4: 5-card paginated location widget ──────────────────
 function Bin4LocationWidget({ d, cur, setCur }: { d: Destination; cur: number; setCur: (n: number) => void }) {
   const total = 5;
@@ -711,6 +955,8 @@ export default function Moodboard({ destination, isWished, onToggleWish, onClose
   const [carouselIdx,    setCarouselIdx]    = useState(0);
   const [carouselPaused, setCarouselPaused] = useState(false);
   const [carouselHover,  setCarouselHover]  = useState<'prev' | 'next' | null>(null);
+  // Bin 2 widget state
+  const [bin2Cur,        setBin2Cur]        = useState(0);
   // Bin 4 widget state
   const [bin4Cur,        setBin4Cur]        = useState(0);
 
@@ -719,6 +965,7 @@ export default function Moodboard({ destination, isWished, onToggleWish, onClose
     setMounted(false);
     setCarouselIdx(0);
     setCarouselPaused(false);
+    setBin2Cur(0);
     setBin4Cur(0);
     const t = requestAnimationFrame(() => setMounted(true));
     return () => cancelAnimationFrame(t);
@@ -740,6 +987,13 @@ export default function Moodboard({ destination, isWished, onToggleWish, onClose
         '@keyframes mb-fade { from { opacity:0 } to { opacity:1 } }',
         '.mb-carousel-btn:hover { color: #f4ecd4 !important; }',
         '@keyframes gc-halo-pulse { 0%,100% { opacity:0.08 } 50% { opacity:1 } }',
+        '.bin2-scroll { scrollbar-width: none; }',
+        '.bin2-scroll::-webkit-scrollbar { display: none; }',
+        '@keyframes bin3-cursor-blink { from { opacity:1 } to { opacity:0 } }',
+        '@keyframes bin3-highlight-swipe { from { background-size: 0% 100% } to { background-size: 100% 100% } }',
+        '@keyframes bin3-text-reveal { from { clip-path: inset(0 100% 0 0) } to { clip-path: inset(0 0% 0 0) } }',
+        '.bin3-highlight { background: linear-gradient(#ffd100, #ffd100) left center / 0% 100% no-repeat; animation: bin3-highlight-swipe 0.6s ease-out forwards; }',
+        '.bin3-highlight-text { clip-path: inset(0 100% 0 0); animation: bin3-text-reveal 0.6s ease-out forwards; }',
       ].join('\n');
       document.head.appendChild(s);
     }
@@ -764,8 +1018,6 @@ export default function Moodboard({ destination, isWished, onToggleWish, onClose
   const imgCount = Math.min(destination.images.length, 5);
   const img      = destination.images;
   const issueNo  = String((destination.id.length * 7 % 80) + 10).padStart(3, '0');
-  const weatherTemp = destination.weather.split('·')[0].trim();
-  const weatherSub  = destination.weather.split('·').slice(1).join(' · ').trim() || 'Mediterranean climate';
 
   const tile = (i: number, hovered = false): React.CSSProperties => ({
     opacity: mounted ? 1 : 0,
@@ -874,37 +1126,16 @@ export default function Moodboard({ destination, isWished, onToggleWish, onClose
           </div>
         </div>
 
-        {/* TILE 2 — Themes */}
+        {/* TILE 2 — Curated Lists widget */}
         <div style={{ ...S.cell, ...S.tileThemes, ...tile(1, hoveredTile === 1) }}
           onMouseEnter={() => setHoveredTile(1)} onMouseLeave={() => setHoveredTile(null)}>
-          <div style={S.themesGlyph}>
-            <span style={{ ...S.themesBar, width: '74%' }} />
-            <span style={{ ...S.themesBar, width: '58%' }} />
-            <span style={{ ...S.themesBar, width: '68%' }} />
-          </div>
-          <div style={S.tileTitle}>Themes</div>
-          <div style={S.tileBody}>
-            {destination.themes.map(t => t[0].toUpperCase() + t.slice(1)).join(' · ')}
-          </div>
+          <Bin2CuratedListsWidget d={destination} cur={bin2Cur} setCur={setBin2Cur} />
         </div>
 
-        {/* TILE 3 — Climate: SVG seasonal curve + weather data */}
+        {/* TILE 3 — Fun Facts carousel */}
         <div style={{ ...S.cell, ...S.tileClimate, ...tile(2, hoveredTile === 2) }}
           onMouseEnter={() => setHoveredTile(2)} onMouseLeave={() => setHoveredTile(null)}>
-          <div style={S.climateChart}>
-            <div style={S.climateLabel}>seasonal swing</div>
-            <svg viewBox="0 0 200 36" style={S.climateSvg} preserveAspectRatio="none">
-              <path d="M0 28 C 30 18, 60 8, 100 6 S 170 22, 200 28"
-                stroke="#ffd100" strokeWidth="1.2" fill="none" />
-              <path d="M0 28 C 30 18, 60 8, 100 6 S 170 22, 200 28 L200 36 L0 36 Z"
-                fill="rgba(255,209,0,0.08)" />
-            </svg>
-            <div style={S.climateAxis}>
-              <span>jan</span><span>apr</span><span>jul</span><span>oct</span>
-            </div>
-          </div>
-          <div style={S.tileTitle}>{weatherTemp}</div>
-          <div style={S.tileBody}>{weatherSub}</div>
+          <Bin3FunFactsWidget key={destination.id} d={destination} />
         </div>
 
         {/* TILE 4 — Location widget: 5-card paginated info panel */}

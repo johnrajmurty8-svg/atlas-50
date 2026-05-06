@@ -55,6 +55,21 @@ export interface Destination {
   timezone?: string;
   flight_time_lhr?: string;
   globe_path?: string;
+  // V11 fields
+  curated_lists?: CuratedLists;
+  fun_facts?: string[];
+}
+
+export interface CuratedEntry {
+  location: string;
+  tagline: string;
+  image?: string;
+}
+
+export interface CuratedLists {
+  culture: CuratedEntry[];
+  nature: CuratedEntry[];
+  food: CuratedEntry[];
 }
 
 export interface SmartPickerState {

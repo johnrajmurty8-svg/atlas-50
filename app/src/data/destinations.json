@@ -29,7 +29,42 @@
     "cost_budget_daily": "~€90/DAY",
     "timezone": "Europe/Rome",
     "flight_time_lhr": "~2h 55m",
-    "globe_path": "M83,71 L96,76 L97,80 L99,83 L104,88 L107,91 L103,94 L100,97 L97,96 L95,91 L97,88 L95,86 L91,82 L86,79 L83,76 Z M90,99 L97,98 L101,101 L99,104 L91,103 Z"
+    "globe_path": "M83,71 L96,76 L97,80 L99,83 L104,88 L107,91 L103,94 L100,97 L97,96 L95,91 L97,88 L95,86 L91,82 L86,79 L83,76 Z M90,99 L97,98 L101,101 L99,104 L91,103 Z",
+    "curated_lists": {
+      "culture": [
+        { "location": "Rome", "tagline": "Two thousand years under open sky", "image": "https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=800" },
+        { "location": "Florence", "tagline": "Where the Renaissance found its voice", "image": "https://images.unsplash.com/photo-1528632799532-401ebb5a8e7f?w=800" },
+        { "location": "Venice", "tagline": "A city that defies the logic of land", "image": "https://images.unsplash.com/photo-1514890547357-a9ee288728e0?w=800" },
+        { "location": "Ravenna", "tagline": "Byzantine mosaics hidden in plain sight", "image": "https://images.unsplash.com/photo-1590068118758-d050cf1605e9?w=800" },
+        { "location": "Naples", "tagline": "Loud, proud, and magnificently alive", "image": "https://images.unsplash.com/photo-1715527532172-5f2a2bf38f4b?w=800" }
+      ],
+      "nature": [
+        { "location": "Dolomites", "tagline": "Peaks that glow rose-gold at dusk", "image": "https://images.unsplash.com/photo-1531210483974-4f8c1f33fd35?w=800" },
+        { "location": "Cinque Terre", "tagline": "Villages stitched to cliffside by habit", "image": "https://images.unsplash.com/photo-1499856871958-5b9627545d1a?w=800" },
+        { "location": "Lake Como", "tagline": "Mirror water between theatrical hills", "image": "https://images.unsplash.com/photo-1604260516933-7d29b2fbc19c?w=800" },
+        { "location": "Amalfi Coast", "tagline": "The most celebrated stretch of coast in Europe", "image": "https://images.unsplash.com/photo-1516483638261-f4dbaf036963?w=800" },
+        { "location": "Sicily", "tagline": "A volcanic island with ancient, stubborn roots", "image": "https://images.unsplash.com/photo-1709319324599-ae6b045e7aac?w=800" }
+      ],
+      "food": [
+        { "location": "Bologna", "tagline": "The city that invented Sunday lunch", "image": "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800" },
+        { "location": "Naples", "tagline": "Where pizza was born and still reigns", "image": "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800" },
+        { "location": "Modena", "tagline": "Balsamic, Lambrusco, and Massimo Bottura", "image": "https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=800" },
+        { "location": "Palermo", "tagline": "Street food as cultural inheritance", "image": "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800" },
+        { "location": "Parma", "tagline": "Prosciutto, Parmigiano, and quiet pride", "image": "https://images.unsplash.com/photo-1693814158074-03bdb0dcd0f5?w=800" }
+      ]
+    },
+    "fun_facts": [
+      "Italy has more **UNESCO World Heritage Sites** than any other country on Earth.",
+      "The average Italian eats roughly **23kg of pasta** per year — and considers it unremarkable.",
+      "Rome contains more **obelisks** than **Egypt** itself, most hauled back during the imperial era.",
+      "Italy is home to over **350 distinct pasta shapes**, each region defending its own with considerable passion.",
+      "The **espresso machine** was patented in **Milan** in 1901, and Italians have been judging your coffee order since.",
+      "**Venice** is built on **118 small islands** connected by 400 bridges, sinking at around 1–2mm per year.",
+      "Italians invented the **piano**, the **radio**, **eyeglasses**, the thermometer, and the electric battery.",
+      "The **Vatican**, entirely surrounded by Rome, is the world's **smallest sovereign state** at just 0.44 km².",
+      "There are more **works of art** per square kilometre in Italy than in any other country on Earth.",
+      "Tuscany's **Chianti** region has been producing wine continuously since at least **1282** — the original DOC."
+    ]
   },
   {
     "id": "japan",

@@ -2,6 +2,42 @@
 
 ---
 
+## V11 — 5 May 2026
+**Change:** Moodboard Bin 2 & Bin 3 Redesign (Curated Lists + Fun Facts Widgets)
+**Brief:** `change-brief-v11.md`
+
+### What Changed
+- Bin 2: replaced static Themes chips + Seasonal Swing chart with a 3-card curated list widget — Culture Top 5, Nature Top 5, Food Top 5 — manual chevron navigation, 3 pip indicators
+- Bin 3: replaced static weather temperature/description with a 10-item Fun Facts & Quotes carousel — 5s auto-transition, manual chevron override, 10 pip indicators, fade transition
+- destinations.json: 2 new fields added — `curated_lists` (3 categories × 5 entries each) and `fun_facts` (array of 10 strings); both populated for Italy; other destinations use placeholders
+- lib/types.ts: added `CuratedEntry`, `CuratedLists` interfaces; added optional `curated_lists` and `fun_facts` to `Destination`
+
+### What Didn't Change
+- Moodboard Bins 1, 4, 5, 6 — untouched
+- Moodboard props interface — identical
+- Topbar, colophon, SAVE/close buttons
+- Bento grid layout and tile dimensions — no reflow
+- All design tokens and fonts
+- CultureGlobe, App, SmartPicker, WishlistDrawer, BottomBar, ThemeChips
+- latLonToVec3 formula — locked
+- flyTo(), resume() API — locked
+- Yellow viewport frame
+- Wishlist localStorage logic
+- Escape key listener
+- Existing destinations.json field names and types
+
+### Affected Documents
+
+| Document | Changed |
+|---|---|
+| PRD | Yes — FR-005 Bin 2 and Bin 3 acceptance criteria |
+| App Flow | No |
+| UI Guide | Yes — §4.7 Bin 2 and Bin 3 specs |
+| Backend Spec | Yes — §2.1 schema: curated_lists, fun_facts fields |
+| Security Checklist | No |
+
+---
+
 ## V10 — 3 May 2026
 
 **Change:** Bin 4 Widget UI Polish (7 Fixes)

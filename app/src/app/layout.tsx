@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { DM_Serif_Display, Inter, JetBrains_Mono } from "next/font/google";
+import { DM_Serif_Display, Inter, JetBrains_Mono, Homemade_Apple } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 
@@ -25,6 +25,13 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
+const homemadeApple = Homemade_Apple({
+  weight: ["400"],
+  subsets: ["latin"],
+  variable: "--font-handwritten",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "Atlas /50",
   description: "A living atlas of the world's most extraordinary destinations — curated by editors, illustrated by the light that finds them.",
@@ -37,7 +44,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" style={{ background: '#050912' }}>
-      <body className={`${dmSerifDisplay.variable} ${inter.variable} ${jetbrainsMono.variable}`}>
+      <body className={`${dmSerifDisplay.variable} ${inter.variable} ${jetbrainsMono.variable} ${homemadeApple.variable}`}>
         {children}
       </body>
       {/* Plausible analytics — update data-domain before production launch */}
