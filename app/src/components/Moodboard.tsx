@@ -137,7 +137,7 @@ function GlobeCard({ d }: { d: Destination }) {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'center', flex: 1, alignItems: 'center' }}>
-        <svg width={308} height={288} viewBox="0 0 186 172">
+        <svg viewBox="0 0 186 172" style={{ width: '100%', height: 'auto', maxWidth: 308 }}>
           <defs>
             <clipPath id="gc">
               <circle cx={CX} cy={CY} r={R} />
@@ -277,7 +277,7 @@ function SeasonWheelCard({ d }: { d: Destination }) {
         {peakStart} → {peakEnd}
       </div>
       <div style={{ flex: 1, display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
-        <svg width={350} height={350} viewBox="0 0 200 200" style={{ marginTop: -19 }}>
+        <svg viewBox="0 0 200 200" style={{ width: '100%', height: 'auto', maxWidth: 350, marginTop: -19 }}>
           {segments.map(({ i, isPeak, pathD, mx, my, tx, ty, m, temp, warmRatio }) => {
             const isHov = hoveredMonth === i;
             const dim   = hoveredMonth !== null && !isHov;
@@ -395,7 +395,7 @@ function VibeRadarCard({ d }: { d: Destination }) {
       <div style={{ fontFamily: T.fontSans, fontSize: 16, color: T.creamDim, marginBottom: 15 }}>{topVibes}</div>
 
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <svg width={461} height={408} viewBox="0 0 240 212" style={{ marginTop: -38 }}>
+        <svg viewBox="0 0 240 212" style={{ width: '100%', height: 'auto', maxWidth: 461, marginTop: -38 }}>
           <g transform={`translate(${CX},${CY})`}>
             {gridRings.map((pts, i) => (
               <polygon key={i} points={pts} fill="none" stroke="rgba(255,255,255,0.20)" strokeWidth={0.5} />
@@ -480,7 +480,7 @@ function CrowdCalendarCard({ d }: { d: Destination }) {
       </div>
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: 8 }}>
-        <svg width={SVG_W} viewBox={`0 0 ${SVG_W} ${SVG_H}`}>
+        <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} style={{ width: '100%', height: 'auto', maxWidth: SVG_W }}>
           {d.crowd_index.map((v, i) => {
             const barH  = Math.round((v / 10) * MAX_H);
             const x     = START_X + i * (BAR_W + GAP);
@@ -507,13 +507,13 @@ function CrowdCalendarCard({ d }: { d: Destination }) {
           })}
         </svg>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', width: 346, padding: '0 2px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: 346, padding: '0 2px' }}>
           {['JAN', 'JUN', 'DEC'].map(m => (
             <span key={m} style={{ fontFamily: T.fontMono, fontSize: 12, color: 'rgba(240,232,208,0.65)', letterSpacing: '0.06em' }}>{m}</span>
           ))}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: 346 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', maxWidth: 346 }}>
           <span style={{ fontFamily: T.fontMono, fontSize: 12, color: 'rgba(240,232,208,0.65)' }}>QUIET</span>
           <div style={{ flex: 1, height: 3, background: 'linear-gradient(to right,rgba(255,220,170,0.12),rgba(255,209,0,0.70))' }} />
           <span style={{ fontFamily: T.fontMono, fontSize: 12, color: 'rgba(240,232,208,0.65)' }}>BUSY</span>
@@ -578,10 +578,10 @@ function CostBreakdownCard({ d }: { d: Destination }) {
         Per person · {d.name}
       </div>
 
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 18 }}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
         {/* Donut SVG */}
         <div style={{ position: 'relative', flexShrink: 0 }}>
-          <svg width={171} height={171} viewBox="0 0 171 171">
+          <svg viewBox="0 0 171 171" style={{ width: '100%', height: 'auto', maxWidth: 171 }}>
             {arcs.map(({ key, pathD, color }) => (
               <path key={key} d={pathD} fill={color} stroke={T.bg} strokeWidth={1.5}
                 style={{
@@ -604,25 +604,23 @@ function CostBreakdownCard({ d }: { d: Destination }) {
           </div>
         </div>
 
-        {/* Legend */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        {/* Legend — unified inline rows: swatch + label + % + amount on one line */}
+        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 6 }}>
           {arcs.map(({ key, label, color, pct }) => (
             <div key={key}
               style={{
-                display: 'flex', alignItems: 'center', gap: 10, marginBottom: 9,
+                display: 'flex', alignItems: 'center', gap: 8,
                 opacity: hoveredSeg === null || hoveredSeg === key ? 1 : 0.4,
                 transition: 'opacity 0.2s',
                 cursor: 'default',
+                fontFamily: T.fontMono, fontSize: 9,
+                color: 'rgba(240,232,208,0.90)', letterSpacing: '0.05em',
               }}
               onMouseEnter={() => setHoveredSeg(key)}
               onMouseLeave={() => setHoveredSeg(null)}
             >
               <div style={{ width: 8, height: 8, background: color, flexShrink: 0 }} />
-              <span style={{ fontFamily: T.fontMono, fontSize: 13, color: 'rgba(240,232,208,0.90)', letterSpacing: '0.05em', flex: 1 }}>{label}</span>
-              <span style={{ fontFamily: T.fontMono, fontSize: 13, color: '#f0e8d0' }}>{Math.round(pct * 100)}%</span>
-              <span style={{ fontFamily: T.fontMono, fontSize: 13, color: 'rgba(240,232,208,0.55)', minWidth: 51, textAlign: 'right' }}>
-                {d.cost_breakdown_amounts![key]}
-              </span>
+              <span>{label} {Math.round(pct * 100)}% · {d.cost_breakdown_amounts![key]}</span>
             </div>
           ))}
         </div>
@@ -777,6 +775,10 @@ function renderWithHighlights(text: string, animate = false) {
   });
 }
 
+// Inserts \n after sentence-ending punctuation so each sentence renders on its own line.
+// Replaces a single space (preserves string length so the typewriter slice stays in sync).
+const splitSentences = (s: string) => s.replace(/([.!?]) (?=\S)/g, '$1\n');
+
 // ─── Bin 3: fun facts — manual scroll animation ───────────────
 function Bin3FunFactsWidget({ d }: { d: Destination }) {
   const facts = d.fun_facts && d.fun_facts.length > 0 ? d.fun_facts : null;
@@ -835,15 +837,17 @@ function Bin3FunFactsWidget({ d }: { d: Destination }) {
   return (
     <div style={{ position: 'relative', height: '100%' }}>
       {/* Paper fills the full tile — reads like the top of a page */}
-      <div style={{
+      <div className="bin3-scroll" style={{
         position: 'absolute', inset: 0,
         background: 'transparent',
         backgroundImage: [
           'repeating-linear-gradient(transparent, transparent 29px, rgba(255,255,255,0.10) 29px, rgba(255,255,255,0.10) 30px)',
           'linear-gradient(to right, transparent 32px, rgba(255,255,255,0.14) 32px, rgba(255,255,255,0.14) 33px, transparent 33px)',
         ].join(', '),
+        backgroundAttachment: 'local',
         padding: '8px 16px 14px 42px',
-        overflow: 'hidden',
+        overflowY: 'auto',
+        overflowX: 'hidden',
       }}>
         {/* header occupies exactly one 30px rule slot so text lines up from the second rule onward */}
         <div style={{ fontFamily: T.fontMono, fontSize: 10, letterSpacing: '0.22em', color: T.amber, textTransform: 'uppercase', height: 30, display: 'flex', alignItems: 'center', marginBottom: 0 }}>
@@ -852,10 +856,11 @@ function Bin3FunFactsWidget({ d }: { d: Destination }) {
         <div style={{
           fontFamily: 'var(--font-handwritten)', fontSize: 18,
           color: 'rgba(255,255,255,0.92)', lineHeight: '30px',
+          whiteSpace: 'pre-line',
         }}>
           {displayedCount < facts[cur].length
-            ? facts[cur].slice(0, displayedCount).replace(/\*\*/g, '')
-            : renderWithHighlights(facts[cur], true)
+            ? splitSentences(facts[cur]).slice(0, displayedCount).replace(/\*\*/g, '')
+            : renderWithHighlights(splitSentences(facts[cur]), true)
           }
           {displayedCount < facts[cur].length && (
             <span style={{ fontFamily: T.fontMono, fontSize: 12, color: 'rgba(255,255,255,0.50)', animation: 'bin3-cursor-blink 0.5s steps(1) infinite' }}>|</span>
@@ -989,6 +994,8 @@ export default function Moodboard({ destination, isWished, onToggleWish, onClose
         '@keyframes gc-halo-pulse { 0%,100% { opacity:0.08 } 50% { opacity:1 } }',
         '.bin2-scroll { scrollbar-width: none; }',
         '.bin2-scroll::-webkit-scrollbar { display: none; }',
+        '.bin3-scroll { scrollbar-width: none; }',
+        '.bin3-scroll::-webkit-scrollbar { display: none; }',
         '@keyframes bin3-cursor-blink { from { opacity:1 } to { opacity:0 } }',
         '@keyframes bin3-highlight-swipe { from { background-size: 0% 100% } to { background-size: 100% 100% } }',
         '@keyframes bin3-text-reveal { from { clip-path: inset(0 100% 0 0) } to { clip-path: inset(0 0% 0 0) } }',
@@ -1301,7 +1308,7 @@ const S: Record<string, React.CSSProperties> = {
     minHeight: 0,
     display: 'grid',
     gridTemplateColumns: 'repeat(12, 1fr)',
-    gridTemplateRows: 'repeat(6, 1fr)',
+    gridTemplateRows: '0.7fr 0.7fr 1.3fr 1.3fr 1fr 1fr',
     gap: 14,
     padding: '18px 38px 14px',
     margin: '0 14px',
@@ -1387,10 +1394,10 @@ const S: Record<string, React.CSSProperties> = {
     fontFamily: "'Inter', sans-serif",
   },
 
-  // Tile 2 — Themes
+  // Tile 2 — Themes (Bin2: curated lists — V12: moved to lower zone, larger)
   tileThemes: {
     gridColumn: '5 / span 4',
-    gridRow: '1 / span 2',
+    gridRow: '3 / span 2',
   },
   themesGlyph: {
     display: 'flex',
@@ -1405,10 +1412,10 @@ const S: Record<string, React.CSSProperties> = {
     display: 'block',
   },
 
-  // Tile 3 — Climate
+  // Tile 3 — Climate (Bin3: fun facts — V12: moved to upper zone, smaller)
   tileClimate: {
     gridColumn: '5 / span 4',
-    gridRow: '3 / span 2',
+    gridRow: '1 / span 2',
   },
   climateChart: { marginBottom: 'auto', position: 'relative' },
   climateLabel: {

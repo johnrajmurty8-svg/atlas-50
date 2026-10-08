@@ -2,6 +2,47 @@
 
 ---
 
+## V12 — 10 May 2026
+**Change:** Bin 2/3 Resize & Swap, Fun Facts Formatting, Bin 4 Responsive Fixes
+**Brief:** `change-brief-v12.md`
+
+### What Changed
+- BIN3 tile size reduced by ~30%; BIN2 expanded proportionally to absorb reclaimed bento grid space
+- BIN2 and BIN3 swapped grid positions on the moodboard
+- Italy's `fun_facts` strings extended by ~25% in word count; placeholder fun facts extended to match; no schema changes
+- BIN3 fun facts text reformatted so each sentence renders on its own line (`white-space: pre-line` or per-sentence render)
+- BIN4 Smart Widget: all five card graphics made fully responsive — SVG fixed dimensions replaced with `viewBox` + `width: 100%`; fixed-pixel containers replaced with fluid widths
+- BIN4 centring corrected for wide desktop viewports (~1920px+)
+- BIN4 Card 5 (Cost Breakdown): legend and donut chart unified into one visual unit; percentage values and currency amounts moved inline into legend rows alongside colour swatches; gap between chart and data eliminated
+
+### What Didn't Change
+- BIN1, BIN5, BIN6 — size, position, and all internal logic untouched
+- BIN4 Cards 1–4 (Globe, Season Wheel, Vibe Radar, Crowd Calendar) — unchanged
+- BIN4 nav arrows, pip dots, card counter (05/05), crossfade transition — all retained
+- BIN3 carousel logic (5s auto-transition, chevron override, 10 pip indicators, fade) — unchanged
+- BIN2 curated list widget internal logic — unchanged
+- All chart data logic and data bindings
+- `destinations.json` field names, types, and schema
+- `lib/types.ts` interfaces
+- All design tokens, fonts, and colour values
+- CultureGlobe, App, SmartPicker, WishlistDrawer, BottomBar, ThemeChips
+- `latLonToVec3` formula — locked
+- `flyTo()`, `resume()` API — locked
+- Yellow viewport frame, wishlist localStorage logic, Escape key listener
+- Vercel deployment config and GitHub pipeline
+
+### Affected Documents
+
+| Document | Changed |
+|---|---|
+| PRD | No |
+| App Flow | No |
+| UI Guide | Yes — §4.7 BIN2/BIN3 tile sizing and order; BIN3 text rendering rule; BIN4 responsive rules; Cost Breakdown legend spec |
+| Backend Spec | Yes — §2.1 fun_facts string length guidance (copy only, no schema change) |
+| Security Checklist | No |
+
+---
+
 ## V11 — 5 May 2026
 **Change:** Moodboard Bin 2 & Bin 3 Redesign (Curated Lists + Fun Facts Widgets)
 **Brief:** `change-brief-v11.md`
@@ -48,7 +89,6 @@
 - Card title `padding-right: 70px` added across all 5 cards to prevent title/nav overlap
 - Globe, Season Wheel, and Vibe Radar graphics increased ~18% in size and centred in card body
 - Bottom-left card name label (GLOBE — LOCATION, SEASON WHEEL, etc.) removed; bottom-right counter retained
-- Text legibility improved across all cards — all label opacities raised, minimum 0.65, primary labels 0.85–0.90
 - Crowd Calendar graph narrowed from 280px to 216px (bar width reduced from 19 to 14)
 - Cost Breakdown card centred; legend text increased to 9px and set to near-white (0.90 opacity)
 - Vibe Radar viewBox widened to 240×212, radar radius increased to R=60, all 5 axis label positions updated; ADVENTURE no longer clips
