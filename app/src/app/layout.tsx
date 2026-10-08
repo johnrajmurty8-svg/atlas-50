@@ -50,7 +50,7 @@ export default function RootLayout({
       {/* Plausible analytics — update data-domain before production launch */}
       <Script
         src="https://plausible.io/js/plausible.js"
-        data-domain="atlas-50.vercel.app"
+        data-domain="atlas-50-sigma.vercel.app"
         strategy="afterInteractive"
         defer
       />
